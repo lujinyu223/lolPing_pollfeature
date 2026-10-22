@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain, screen } from 'electron';
 import { TEXT_CH, type Point, type TextAnswer, type TextBoxText } from '../shared/ipc';
 import { placeInside } from './coords';
 import { IS_MAC, loadPage, pageUrl, preloadPath } from './paths';
+import { normalizePoll, type PollDefinition } from '../shared/pollTally';
 
 /** The box's size in DIPs. */
 const WIDTH = 420;
@@ -13,6 +14,7 @@ let win: BrowserWindow | null = null;
 let at: Point = { x: 0, y: 0 };
 let text: TextBoxText | null = null;
 let submit: ((raw: string, at: Point) => TextAnswer) | null = null;
+let creatingPoll = false;
 const goneListeners: Array<() => void> = [];
 
 export function onTextWindowGone(cb: () => void): void {
@@ -25,11 +27,27 @@ export function closeTextWindow(): void {
 }
 
 /** `onSubmit` answers what the box typed: 'sent' closes it, anything else keeps it open with that hint. */
-export function registerTextWindow(onSubmit: (raw: string, at: Point) => TextAnswer): void {
+export function registerTextWindow(
+  onSubmit: (raw: string, at: Point) => TextAnswer,
+  onPoll: (poll: PollDefinition) => TextAnswer,
+): void {
   submit = onSubmit;
   ipcMain.handle(TEXT_CH.submit, (event, raw: unknown): TextAnswer => {
     if (win?.webContents !== event.sender || typeof raw !== 'string' || !submit) return 'unknown';
     const answer = submit(raw, at);
+    if (answer === 'poll') {
+      creatingPoll = true;
+      const size = { width: WIDTH, height: 470 };
+      win.setBounds({ ...placeInside(at, size, screen.getDisplayNearestPoint(at).workArea), ...size });
+    }
+    if (answer === 'sent') win.close();
+    return answer;
+  });
+  ipcMain.handle(TEXT_CH.poll, (event, raw: unknown): TextAnswer => {
+    if (win?.webContents !== event.sender || !creatingPoll) return 'unknown';
+    const poll = normalizePoll(raw);
+    if (!poll) return 'invalidPoll';
+    const answer = onPoll(poll);
     if (answer === 'sent') win.close();
     return answer;
   });
@@ -48,6 +66,7 @@ export function openTextWindow(point: Point, strings: TextBoxText): void {
   }
   at = point;
   text = strings;
+  creatingPoll = false;
   const spot = placeInside(point, { width: WIDTH, height: HEIGHT }, screen.getDisplayNearestPoint(point).workArea);
   const w = new BrowserWindow({
     ...spot,

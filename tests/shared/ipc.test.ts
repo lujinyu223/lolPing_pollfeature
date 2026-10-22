@@ -4,6 +4,13 @@ import { parsePanelAction } from '../../src/shared/ipc';
 const peer = '0123456789abcdef';
 
 describe('parsePanelAction', () => {
+  it('validates poll ids and distinct bounded choices', () => {
+    const action = { t: 'pollBallot', id: 'abcdef01', choices: [0, 2] };
+    expect(parsePanelAction(action)).toEqual(action);
+    expect(parsePanelAction({ ...action, id: 'bad' })).toBeNull();
+    for (const choices of [[], [1, 1], [6], ['1']]) expect(parsePanelAction({ ...action, choices })).toBeNull();
+  });
+
   it('accepts only well-formed panel actions', () => {
     expect(parsePanelAction({ t: 'alive', peer })).toEqual({ t: 'alive', peer });
     expect(parsePanelAction({ t: 'mute', peer, on: true })).toEqual({ t: 'mute', peer, on: true });

@@ -1,5 +1,6 @@
 import type { KeyObject } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import type { PollDefinition } from '../shared/pollTally';
 import type { EmoteRef } from '../shared/emotes';
 import type { PingId } from '../shared/pings';
 import type { JoinResult, MemberPath, RoomMember, RoomStateCore } from '../shared/room';
@@ -253,6 +254,14 @@ export class RoomManager extends EventEmitter {
 
   sendBallot(id: string, yes: boolean): void {
     this.sendShared({ t: 'ballot', id, yes });
+  }
+
+  sendPoll(id: string, poll: PollDefinition): void {
+    this.sendShared({ t: 'poll', id, ...poll });
+  }
+
+  sendPollBallot(id: string, choices: number[]): void {
+    this.sendShared({ t: 'pollBallot', id, choices });
   }
 
   /** Removes a member and ignores that peer ID for the rest of the session, as if it had said bye. */
@@ -542,9 +551,9 @@ export class RoomManager extends EventEmitter {
     }
     // A ballot is the one answer a vote waits for, so a muted member's still counts and so does our own pause;
     // the vote unit decides. Only a member we can't read, and a ballot flood, are shut out.
-    if (msg.t === 'ballot') {
+    if (msg.t === 'ballot' || msg.t === 'pollBallot') {
       if (m.needsUpdate || !this.ballotLimiter.allow(m.peer, BALLOT_RATE, 1)) return;
-      this.emit('ballot', msg satisfies BallotMsg);
+      this.emit(msg.t, msg);
       return;
     }
     // Pings, emotes, text, alive lines and votes pass the same gates and share one budget per member.
@@ -552,6 +561,10 @@ export class RoomManager extends EventEmitter {
     if (!this.limiter.allow(m.peer, this.deps.profile().limit)) return;
     if (msg.t === 'vote') {
       this.emit('vote', msg satisfies VoteMsg);
+      return;
+    }
+    if (msg.t === 'poll') {
+      this.emit('poll', msg);
       return;
     }
     if (msg.t === 'alive' && msg.who !== this.self && !this.members.has(msg.who)) return;

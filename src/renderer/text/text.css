@@ -13,3 +13,21 @@ input::placeholder { color: var(--grey-2); font-weight: 400; }
 #count.full { color: var(--red); }
 small { display: block; height: 18px; margin-top: 1px; padding: 0 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--grey-1); font-size: 11px; line-height: 18px; }
 small.warn { color: var(--red); }
+
+.poll-form { height: 100%; overflow-y: auto; padding: 10px; font-size: 13px; }
+.poll-form h1 { margin: 0 0 10px; font: 700 19px/24px var(--serif); }
+.poll-form label { display: grid; grid-template-columns: 70px minmax(0, 1fr); align-items: center; gap: 8px; margin-bottom: 8px; }
+.poll-form input, .poll-form select {
+	display: block; width: 100%; height: 28px; padding: 3px 7px; border: 1px solid var(--gold-5);
+	background: #0b1519; color: var(--gold-1); font: 13px/20px var(--sans);
+}
+.poll-form input:focus, .poll-form select:focus { outline: 1px solid var(--teal); }
+.poll-form fieldset { min-width: 0; margin: 0; padding: 5px 8px 8px; border: 1px solid var(--gold-5); }
+.poll-form fieldset input + input { margin-top: 5px; }
+.poll-error { min-height: 32px; margin: 8px 0; color: var(--red); font-size: 12px; overflow-wrap: anywhere; }
+.poll-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.poll-actions button {
+	min-height: 30px; padding: 4px 12px; border: 1px solid var(--gold-4); background: #1e2328;
+	color: var(--gold-1); font: 13px/20px var(--sans); cursor: pointer;
+}
+.poll-actions button:disabled { opacity: .5; cursor: default; }

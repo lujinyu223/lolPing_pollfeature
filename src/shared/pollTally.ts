@@ -18,6 +18,12 @@ export interface PollView extends PollDefinition {
 
 export const POLL_MS = 60_000;
 
+export function parsePollChoices(raw: unknown): number[] | null {
+  if (!Array.isArray(raw) || raw.length < 1 || raw.length > 6 || new Set(raw).size !== raw.length) return null;
+  return raw.every((choice): choice is number => typeof choice === 'number' && Number.isInteger(choice) && choice >= 0 && choice < 6)
+    ? [...raw] : null;
+}
+
 export function normalizePoll(raw: unknown): PollDefinition | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const { mode, question, options } = raw as Record<string, unknown>;
@@ -57,7 +63,7 @@ export class PollTally {
     const poll = this.open;
     if (!poll || poll.over || this.now() >= poll.endsAt || poll.id !== id ||
         !poll.voters.includes(peer) || Object.hasOwn(poll.ballots, peer)) return false;
-    if (!choices.length || choices.length > poll.counts.length || new Set(choices).size !== choices.length ||
+    if (!parsePollChoices(choices) || choices.length > poll.counts.length ||
         poll.mode !== 'multiple' && choices.length !== 1 ||
         !choices.every((choice) => Number.isInteger(choice) && choice >= 0 && choice < poll.counts.length)) return false;
     poll.ballots[peer] = [...choices];

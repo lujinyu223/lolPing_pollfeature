@@ -11,6 +11,7 @@ type View = PanelState['view'];
 const ALLOWED: Record<View, ReadonlySet<PanelAction['t']>> = {
   vote: new Set(['ballot']),
   roster: new Set(['alive', 'mute', 'kick', 'vote']),
+  poll: new Set(['pollBallot']),
 };
 
 interface Slot {
@@ -30,7 +31,7 @@ const emptySlot = (): Slot => ({ win: null, loaded: false, state: null, shown: f
  * Emits 'action' with a validated PanelAction.
  */
 export class PanelWindows extends EventEmitter {
-  private readonly slots: Record<View, Slot> = { roster: emptySlot(), vote: emptySlot() };
+  private readonly slots: Record<View, Slot> = { roster: emptySlot(), vote: emptySlot(), poll: emptySlot() };
 
   constructor() {
     super();
@@ -45,6 +46,14 @@ export class PanelWindows extends EventEmitter {
 
   hideVote(): void {
     this.hide('vote');
+  }
+
+  showPoll(state: PanelState): void {
+    this.show('poll', centredIn({ width: 380, height: 440 }, screen.getPrimaryDisplay().workArea), state);
+  }
+
+  hidePoll(): void {
+    this.hide('poll');
   }
 
   /** Centred on the display under `at`, the cursor. */
@@ -66,7 +75,7 @@ export class PanelWindows extends EventEmitter {
 
   destroy(): void {
     ipcMain.removeListener(PANEL_CH.action, this.onAction);
-    for (const view of ['roster', 'vote'] as const) {
+    for (const view of ['roster', 'vote', 'poll'] as const) {
       const w = this.slots[view].win;
       this.slots[view] = emptySlot();
       if (w && !w.isDestroyed()) w.destroy();
@@ -90,6 +99,7 @@ export class PanelWindows extends EventEmitter {
     if (!slot.win || slot.win.isDestroyed()) return;
     // The window is reused: clear what it drew, so the next show can't flash this vote's card before its own.
     if (view === 'vote' && slot.state) slot.win.webContents.send(PANEL_CH.state, { ...slot.state, vote: null, voteOver: false });
+    if (view === 'poll' && slot.state) slot.win.webContents.send(PANEL_CH.state, { ...slot.state, poll: null });
     slot.win.hide();
   }
 
@@ -158,7 +168,7 @@ export class PanelWindows extends EventEmitter {
   }
 
   private readonly onAction = (event: IpcMainEvent, raw: unknown): void => {
-    const view = (['roster', 'vote'] as const).find((v) => this.slots[v].win?.webContents === event.sender);
+    const view = (['roster', 'vote', 'poll'] as const).find((v) => this.slots[v].win?.webContents === event.sender);
     if (!view) return;
     const action = parsePanelAction(raw);
     if (action && ALLOWED[view].has(action.t)) this.emit('action', action);

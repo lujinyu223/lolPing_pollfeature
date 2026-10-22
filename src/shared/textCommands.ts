@@ -6,6 +6,7 @@ export type TextInput =
   | { kind: 'ff' }
   | { kind: 'noff' }
   | { kind: 'ready' }
+  | { kind: 'poll' }
   | { kind: 'unknown' }
   | { kind: 'empty' };
 
@@ -14,7 +15,7 @@ export function parseTextInput(raw: string): TextInput {
   const text = sanitizeText(raw);
   if (text === '') return { kind: 'empty' };
   if (!text.startsWith('/')) return { kind: 'text', text };
-  switch (text.toLowerCase()) {
+  switch (text.toLowerCase().replace(/^\/\//, '/')) {
     case '/ff':
     case '/surrender':
       return { kind: 'ff' };
@@ -22,6 +23,8 @@ export function parseTextInput(raw: string): TextInput {
       return { kind: 'noff' };
     case '/ready':
       return { kind: 'ready' };
+    case '/poll':
+      return { kind: 'poll' };
     default:
       return { kind: 'unknown' };
   }

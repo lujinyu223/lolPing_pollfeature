@@ -14,6 +14,16 @@ describe('parseTextInput', () => {
     expect(parseTextInput('/ready')).toEqual({ kind: 'ready' });
   });
 
+  it('opens polls and accepts double slash commands', () => {
+    expect(parseTextInput('/poll')).toEqual({ kind: 'poll' });
+    expect(parseTextInput(' //POLL ')).toEqual({ kind: 'poll' });
+    expect(parseTextInput('//ff')).toEqual({ kind: 'ff' });
+    expect(parseTextInput('//ready')).toEqual({ kind: 'ready' });
+    expect(parseTextInput('//noff')).toEqual({ kind: 'noff' });
+    expect(parseTextInput('//poll now')).toEqual({ kind: 'unknown' });
+    expect(parseTextInput('///poll')).toEqual({ kind: 'unknown' });
+  });
+
   it('calls any other slash word unknown', () => {
     expect(parseTextInput('/remake')).toEqual({ kind: 'unknown' });
     expect(parseTextInput('/')).toEqual({ kind: 'unknown' });

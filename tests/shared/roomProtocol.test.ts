@@ -39,6 +39,30 @@ describe('encode / decode', () => {
 });
 
 describe('text messages', () => {
+  it('validates polls and ballots without changing existing vote messages', () => {
+    const poll = { ...base, t: 'poll', id: 'abcdef01', mode: 'single', question: 'Map?', options: ['A', 'B'] };
+    expect(validateMessage(poll)).toEqual(poll);
+    expect(decodeMessage(encodeMessage({ ...base, t: 'pollBallot', id: 'abcdef01', choices: [0, 1] })))
+      .toEqual({ ...base, t: 'pollBallot', id: 'abcdef01', choices: [0, 1] });
+    for (const patch of [{ id: 'bad' }, { mode: 'bad' }, { question: '' }, { options: ['A'] }]) {
+      expect(validateMessage({ ...poll, ...patch })).toBeNull();
+    }
+    for (const choices of [[], [0, 0], [-1], [6], [0.5], ['0']]) {
+      expect(validateMessage({ ...base, t: 'pollBallot', id: 'abcdef01', choices })).toBeNull();
+    }
+  });
+
+  it('keeps the largest signed poll within the encrypted packet cap', () => {
+    const poll = validateMessage({
+      ...base, t: 'poll', id: 'abcdef01', mode: 'multiple', question: '😀'.repeat(60),
+      options: Array.from({ length: 6 }, (_, index) => '😀'.repeat(23) + String.fromCodePoint(0x1f601 + index)),
+    });
+    expect(poll).not.toBeNull();
+    if (!poll) return;
+    const signed = joinSigned(new TextDecoder().decode(encodeMessage(poll)), Buffer.alloc(64).toString('base64'));
+    expect(seal(Buffer.alloc(32), new TextEncoder().encode(signed)).length).toBeLessThanOrEqual(MAX_PACKET);
+  });
+
   it('sanitises unsafe characters and limits text by code point', () => {
     expect(sanitizeText('  Go\u202e mid\u0000  ')).toBe('Go mid');
     expect([...sanitizeText('😀'.repeat(MAX_TEXT + 5))]).toHaveLength(MAX_TEXT);

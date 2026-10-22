@@ -1,5 +1,6 @@
 import { ANNOUNCED_MAX, HASH_RE, isEmoteFx, isEmoteRefShape, type EmoteRef } from './emotes';
 import { isPingId, type PingId } from './pings';
+import { normalizePoll, parsePollChoices, type PollDefinition } from './pollTally';
 import { isTagColor, isTagRgb, type TagRgb } from './roomColors';
 
 /** Bumped when room messages change incompatibly. Peers on another version are shown as "needs update". */
@@ -93,6 +94,15 @@ export interface BallotMsg extends Base {
   id: string;
   yes: boolean;
 }
+export interface PollMsg extends Base, PollDefinition {
+  t: 'poll';
+  id: string;
+}
+export interface PollBallotMsg extends Base {
+  t: 'pollBallot';
+  id: string;
+  choices: number[];
+}
 /** Added in 0.5.2: asks the peer named `to` for the still of custom emote `h`. `need` lists chunk indexes, [] = all of them. */
 export interface WantMsg extends Base {
   t: 'want';
@@ -111,7 +121,7 @@ export interface ChunkMsg extends Base {
 export interface ByeMsg extends Base {
   t: 'bye';
 }
-export type RoomMessage = PresenceMsg | PingMsg | EmoteMsg | TextMsg | AliveMsg | VoteMsg | BallotMsg | WantMsg | ChunkMsg | ByeMsg;
+export type RoomMessage = PresenceMsg | PingMsg | EmoteMsg | TextMsg | AliveMsg | VoteMsg | BallotMsg | PollMsg | PollBallotMsg | WantMsg | ChunkMsg | ByeMsg;
 
 // C0/C1 controls, zero-width characters, bidi marks, embeddings and isolates, BOM, line/paragraph separators,
 // soft hyphen, combining grapheme joiner, Arabic letter mark, Mongolian vowel separator and the Hangul fillers
@@ -228,6 +238,14 @@ export function validateMessage(raw: unknown): RoomMessage | null {
     case 'ballot': {
       const { id, yes } = raw;
       return isVoteId(id) && typeof yes === 'boolean' ? { t, ...base, id, yes } : null;
+    }
+    case 'poll': {
+      const poll = normalizePoll(raw);
+      return isVoteId(raw.id) && poll ? { t, ...base, id: raw.id, ...poll } : null;
+    }
+    case 'pollBallot': {
+      const choices = parsePollChoices(raw.choices);
+      return isVoteId(raw.id) && choices ? { t, ...base, id: raw.id, choices } : null;
     }
     case 'want': {
       const { to, h, need } = raw;

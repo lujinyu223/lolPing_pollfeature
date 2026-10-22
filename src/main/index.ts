@@ -35,6 +35,7 @@ import { PanelWindows } from './panelWindows';
 import { MAX_MEMBERS, RoomManager, type RoomToast } from './roomManager';
 import { postLine, startRoomText, type RoomTextDeps } from './roomText';
 import { RoomVotes, voteResultLine } from './roomVotes';
+import { RoomPolls } from './roomPolls';
 import { registerSettingsIpc } from './settingsIpc';
 import { SettingsStore } from './settingsStore';
 import { onSettingsWindowGone, openSettingsWindow, settingsWindow } from './settingsWindow';
@@ -382,6 +383,9 @@ function start(): void {
       case 'ballot':
         roomVotes?.answer(a.yes);
         break;
+      case 'pollBallot':
+        roomPolls?.answer(a.id, a.choices);
+        break;
       case 'alive':
         // The cursor, as the text box does: the page's own screen point is not in DIPs on every display setup.
         sendOwnAlive(a.peer, screen.getCursorScreenPoint());
@@ -402,8 +406,28 @@ function start(): void {
   };
   // Votes run while the feature is on; with it off, members' votes and ballots are ignored here.
   let roomVotes: RoomVotes | null = null;
+  let roomPolls: RoomPolls | null = null;
   const syncRoomVotes = (): void => {
     const on = featureOn(settings, 'roomVotes');
+    if (on && !roomPolls) {
+      roomPolls = new RoomPolls({
+        room, now: Date.now, randomId: () => randomBytes(4).toString('hex'),
+        onView: (poll) => poll ? panels.showPoll({ ...panelState('poll', null), poll }) : panels.hidePoll(),
+        onResult: (poll) => {
+          const t = text();
+          const options = poll.mode === 'yesno' ? [t.voteYes, t.voteNo] : poll.options;
+          const display = screen.getPrimaryDisplay();
+          postLine(lineDeps, {
+            kind: 'vote', owner: 'vote', tag: null, displayId: display.id,
+            x: display.bounds.width / 2, y: display.bounds.height * 0.2,
+            text: t.pollResult(poll.question, options.map((option, index) => `${option}: ${poll.counts[index]}`)),
+          });
+        },
+      });
+    } else if (!on && roomPolls) {
+      roomPolls.stop();
+      roomPolls = null;
+    }
     if (on && !roomVotes) {
       roomVotes = new RoomVotes({
         room,
@@ -501,6 +525,8 @@ function start(): void {
         return 'sent';
       case 'unknown':
         return 'unknown';
+      case 'poll':
+        return roomPolls ? 'poll' : 'votesOff';
       case 'ff':
       case 'ready':
         if (!roomVotes) return 'votesOff';
@@ -515,6 +541,10 @@ function start(): void {
       default:
         return 'sent'; // nothing usable was typed: just close
     }
+  }, (poll) => {
+    if (!featureOn(settings, 'roomVotes') || !roomPolls) return 'votesOff';
+    const result = roomPolls.start(poll);
+    return result === 'started' ? 'sent' : result === 'busy' ? 'busy' : 'invalidPoll';
   });
   onTextWindowGone(() => {
     textOpen = false;
@@ -527,6 +557,7 @@ function start(): void {
     const t = text();
     try {
       openTextWindow(screen.getCursorScreenPoint(), {
+        lang: resolveLang(settings.language, app.getLocale()),
         placeholder: t.textBoxPlaceholder, hint: t.textBoxHint, unknown: t.textBoxUnknown, votesOff: t.textBoxVotesOff,
       });
     } catch (err) {

@@ -10,6 +10,8 @@ import { PEER_RE } from './roomProtocol';
 import type { OverlaySettings, RoomTextStyle, Settings } from './settings';
 import type { UpdateState } from './update';
 import type { VoteView } from './voteTally';
+import { parsePollChoices, type PollDefinition, type PollView } from './pollTally';
+import { isVoteId } from './roomProtocol';
 
 export interface Point {
   x: number;
@@ -50,10 +52,11 @@ export const OVERLAY_CHANNELS: readonly OverlayChannel[] = [
   'toast:show', 'text:spawn',
 ];
 
-export const TEXT_CH = { submit: 'text:submit', cancel: 'text:cancel', strings: 'text:strings' } as const;
+export const TEXT_CH = { submit: 'text:submit', poll: 'text:poll', cancel: 'text:cancel', strings: 'text:strings' } as const;
 
 /** The text box's words, in the language the app uses. */
 export interface TextBoxText {
+  lang?: Lang;
   placeholder: string;
   /** The commands the box understands, shown under the input. */
   hint: string;
@@ -64,11 +67,12 @@ export interface TextBoxText {
 }
 
 /** What the app made of a submit: 'sent' closes the box, the others keep it open with a hint. */
-export type TextAnswer = 'sent' | 'unknown' | 'votesOff';
+export type TextAnswer = 'sent' | 'unknown' | 'votesOff' | 'poll' | 'invalidPoll' | 'busy';
 
 export interface TextApi {
   /** Resolves with the app's answer; on 'sent' the window closes. */
   submit(text: string): Promise<TextAnswer>;
+  startPoll(poll: PollDefinition): Promise<TextAnswer>;
   cancel(): void;
   strings(): Promise<TextBoxText | null>;
 }
@@ -77,13 +81,14 @@ export const PANEL_CH = { state: 'panel:state', action: 'panel:action' } as cons
 
 /** Everything a panel window draws. The roster and the vote widget get the same shape, so one message feeds either. */
 export interface PanelState {
-  view: 'roster' | 'vote';
+  view: 'roster' | 'vote' | 'poll';
   lang: Lang;
   /** The room's member limit. */
   max: number;
   room: RoomStateCore;
   history: readonly HistoryLine[];
   vote: VoteView | null;
+  poll?: PollView | null;
   /** The vote's result is in: its widget stays a moment with the buttons off and the countdown stopped. */
   voteOver: boolean;
   /** The room text and room votes feature switches. */
@@ -99,7 +104,8 @@ export type PanelAction =
   | { t: 'mute'; peer: string; on: boolean }
   | { t: 'kick'; peer: string }
   | { t: 'vote'; kind: 'ff' | 'ready' }
-  | { t: 'ballot'; yes: boolean };
+  | { t: 'ballot'; yes: boolean }
+  | { t: 'pollBallot'; id: string; choices: number[] };
 
 export interface PanelApi {
   /** Calls `cb` with every state the main process sends; returns the way to stop. */
@@ -124,6 +130,10 @@ export function parsePanelAction(raw: unknown): PanelAction | null {
       return a.kind === 'ff' || a.kind === 'ready' ? { t: 'vote', kind: a.kind } : null;
     case 'ballot':
       return typeof a.yes === 'boolean' ? { t: 'ballot', yes: a.yes } : null;
+    case 'pollBallot': {
+      const choices = parsePollChoices(a.choices);
+      return isVoteId(a.id) && choices ? { t: 'pollBallot', id: a.id, choices } : null;
+    }
     default:
       return null;
   }
