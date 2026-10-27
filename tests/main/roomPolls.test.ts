@@ -33,11 +33,12 @@ describe('RoomPolls', () => {
     expect(polls.start(definition)).toBe('started');
     expect(polls.start(definition)).toBe('busy');
     expect(sent[0]).toEqual({ id: 'abcdef01', definition });
-    polls.answer('wrong', [1]);
-    polls.answer('abcdef01', [1]);
-    polls.answer('abcdef01', [0]);
+    expect(polls.answer('wrong', [1])).toBe(false);
+    expect(polls.answer('abcdef01', [1])).toBe(true);
+    expect(polls.answer('abcdef01', [0])).toBe(false);
     room.emit('pollBallot', { peer: 'stranger', id: 'abcdef01', choices: [0] });
     expect(views.at(-1)?.counts).toEqual([0, 1]);
+    expect(polls.current()?.ballots.me).toEqual([1]);
     room.emit('pollBallot', { peer: 'guest', id: 'abcdef01', choices: [0] });
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ over: true, counts: [1, 1] });

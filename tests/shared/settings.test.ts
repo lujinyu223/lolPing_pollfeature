@@ -19,6 +19,12 @@ describe('normalizeSettings', () => {
     expect(s.clickPing).toBe(true);
   });
 
+  it('persists normalized spin-wheel choices and their weights', () => {
+    const s = normalizeSettings({ spinWheel: [{ label: 'Map A', weight: 4 }, { label: 'Map B', weight: 2 }] });
+    expect(s.spinWheel).toEqual([{ label: 'Map A', weight: 4 }, { label: 'Map B', weight: 2 }]);
+    expect(normalizeSettings({}).spinWheel).toEqual([]);
+  });
+
   it('clamps and rounds numbers to their limits', () => {
     const s = normalizeSettings({ dragThresholdPx: 0, pingSizePx: 999, pingDurationS: 3.27, volume: 55.6 });
     expect(s.dragThresholdPx).toBe(2);

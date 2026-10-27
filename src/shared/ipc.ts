@@ -12,6 +12,7 @@ import type { UpdateState } from './update';
 import type { VoteView } from './voteTally';
 import { parsePollChoices, type PollDefinition, type PollView } from './pollTally';
 import { isVoteId } from './roomProtocol';
+import type { SpinChoice } from './spinWheel';
 
 export interface Point {
   x: number;
@@ -52,7 +53,10 @@ export const OVERLAY_CHANNELS: readonly OverlayChannel[] = [
   'toast:show', 'text:spawn',
 ];
 
-export const TEXT_CH = { submit: 'text:submit', poll: 'text:poll', cancel: 'text:cancel', strings: 'text:strings' } as const;
+export const TEXT_CH = {
+  submit: 'text:submit', poll: 'text:poll', spinWheel: 'text:spinwheel', spin: 'text:spin', spinResult: 'text:spin-result',
+  cancel: 'text:cancel', strings: 'text:strings',
+} as const;
 
 /** The text box's words, in the language the app uses. */
 export interface TextBoxText {
@@ -64,15 +68,24 @@ export interface TextBoxText {
   unknown: string;
   /** Shown instead of the hint for a vote command while votes are switched off. */
   votesOff: string;
+  spinChoices: SpinChoice[];
 }
 
 /** What the app made of a submit: 'sent' closes the box, the others keep it open with a hint. */
-export type TextAnswer = 'sent' | 'unknown' | 'votesOff' | 'poll' | 'invalidPoll' | 'busy';
+export type TextAnswer = 'sent' | 'unknown' | 'votesOff' | 'poll' | 'invalidPoll' | 'busy' | 'spinwheel' | 'spin' | 'invalidSpinWheel';
+
+export interface TextSpinSelection {
+  index: number;
+  label: string;
+}
 
 export interface TextApi {
   /** Resolves with the app's answer; on 'sent' the window closes. */
   submit(text: string): Promise<TextAnswer>;
   startPoll(poll: PollDefinition): Promise<TextAnswer>;
+  saveSpinWheel(choices: SpinChoice[]): Promise<TextAnswer>;
+  startSpin(): Promise<TextSpinSelection | null>;
+  finishSpin(): Promise<void>;
   cancel(): void;
   strings(): Promise<TextBoxText | null>;
 }
@@ -89,6 +102,8 @@ export interface PanelState {
   history: readonly HistoryLine[];
   vote: VoteView | null;
   poll?: PollView | null;
+  /** The poll is docked at the screen corner and can be restored to its saved bounds. */
+  pollMinimized?: boolean;
   /** The vote's result is in: its widget stays a moment with the buttons off and the countdown stopped. */
   voteOver: boolean;
   /** The room text and room votes feature switches. */
@@ -105,7 +120,9 @@ export type PanelAction =
   | { t: 'kick'; peer: string }
   | { t: 'vote'; kind: 'ff' | 'ready' }
   | { t: 'ballot'; yes: boolean }
-  | { t: 'pollBallot'; id: string; choices: number[] };
+  | { t: 'pollBallot'; id: string; choices: number[] }
+  | { t: 'pollMinimize'; id: string }
+  | { t: 'pollRestore'; id: string };
 
 export interface PanelApi {
   /** Calls `cb` with every state the main process sends; returns the way to stop. */
@@ -134,6 +151,10 @@ export function parsePanelAction(raw: unknown): PanelAction | null {
       const choices = parsePollChoices(a.choices);
       return isVoteId(a.id) && choices ? { t: 'pollBallot', id: a.id, choices } : null;
     }
+    case 'pollMinimize':
+      return isVoteId(a.id) ? { t: 'pollMinimize', id: a.id } : null;
+    case 'pollRestore':
+      return isVoteId(a.id) ? { t: 'pollRestore', id: a.id } : null;
     default:
       return null;
   }

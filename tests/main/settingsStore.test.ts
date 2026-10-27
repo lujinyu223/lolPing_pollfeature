@@ -120,6 +120,16 @@ describe('SettingsStore', () => {
     expect(again.wheelSizePx).toBe(450);
   });
 
+  it('persists spin-wheel entries and weights across launches', async () => {
+    const dir = tempDir();
+    const store = new SettingsStore(dir);
+    store.load();
+    const spinWheel = [{ label: 'Map A', weight: 3 }, { label: 'Map B', weight: 1 }];
+    store.update({ spinWheel });
+    await store.flush();
+    expect(new SettingsStore(dir).load().spinWheel).toEqual(spinWheel);
+  });
+
   it('debounces writes and keeps the last value', async () => {
     const dir = tempDir();
     const store = new SettingsStore(dir, 60);

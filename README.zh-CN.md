@@ -53,7 +53,7 @@ Mac 版需要 Apple 芯片（M1 或更新）的 Mac 和 macOS 13 或更新版本
 此 fork 已增加 Linux 支持，在 Ubuntu 24.04 / X11 上开发验证。请使用真正的 **X11 / Xorg 登录会话**；目前不支持 Wayland（包括 Wayland 会话中的 XWayland）。[最新版本](https://github.com/lujinyu223/lolPing_pollfeature/releases/latest)提供 x64 的 AppImage 和 Debian 安装包。
 
 - 构建：安装 Node.js 22.12+、C++20 编译器及 `libx11-dev libxi-dev libxtst-dev`，运行 `npm ci` 和 `npm run dist:linux`。
-- 输出：`release/` 中的 `.AppImage` 和 `.deb`。Ubuntu/Debian 推荐 `sudo apt install ./release/lolPing-0.5.1-amd64.deb`。
+- 输出：`release/` 中的 `.AppImage` 和 `.deb`。Ubuntu/Debian 推荐 `sudo apt install ./release/lolPing-0.5.6-amd64.deb`。
 - 操作与 Windows 类似；如 Alt + 拖动被桌面占用，请在设置中更换触发键。Linux 不提供 Caps Lock 触发键或全屏游戏自动检测。
 - 需要桌面合成器；GNOME 需要 AppIndicator 扩展显示托盘。Linux 目前手动更新，界面使用 1:1 屏幕像素，不跟随 HiDPI 缩放。
 - 设置在 `~/.config/lolPing/settings.json`，登录启动项在 `~/.config/autostart/lolPing.desktop`（支持 `XDG_CONFIG_HOME`）。
@@ -169,7 +169,7 @@ npm run dev
 
 ### 发布新版本
 
-修改 `package.json` 中的 `version` 并提交，然后推送标签，标签必须是 `v` 加上完整的版本号。例如，版本 `0.5.4` 对应的标签是 `v0.5.4`，不是 `v0.5.0.4`。创建标签前，先检查应使用的标签：
+修改 `package.json` 中的 `version` 并提交，然后推送标签，标签必须是 `v` 加上完整的版本号。例如，版本 `0.5.6` 对应的标签是 `v0.5.6`，不是 `v0.5.0.6`。创建标签前，先检查应使用的标签：
 
 ```bash
 node -p "'v' + require('./package.json').version"

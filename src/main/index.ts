@@ -16,6 +16,7 @@ import { formatRoomCode, parseRoomCode } from '../shared/roomCode';
 import { sameTagRgb, tagWire } from '../shared/roomColors';
 import { overlaySettings, soundLevel, type Settings } from '../shared/settings';
 import { parseTextInput } from '../shared/textCommands';
+import { chooseSpinIndex } from '../shared/spinWheel';
 import { updateErrorText, type UpdateState } from '../shared/update';
 import { registerAppScheme, serveAppScheme } from './appProtocol';
 import { resolveTarget, toShared } from './displayNumbers';
@@ -373,6 +374,7 @@ function start(): void {
     vote, voteOver, textOn: featureOn(settings, 'roomText'), votesOn: featureOn(settings, 'roomVotes'),
     volume: soundLevel(settings),
   });
+  let visiblePollId: string | null = null;
   /** An open roster follows the room and its history; a hidden one ignores this. */
   function refreshRoster(): void {
     panels.update(panelState('roster', null));
@@ -384,7 +386,13 @@ function start(): void {
         roomVotes?.answer(a.yes);
         break;
       case 'pollBallot':
-        roomPolls?.answer(a.id, a.choices);
+        if (roomPolls?.answer(a.id, a.choices)) panels.minimizePoll(a.id);
+        break;
+      case 'pollMinimize':
+        panels.minimizePoll(a.id);
+        break;
+      case 'pollRestore':
+        panels.restorePoll(a.id);
         break;
       case 'alive':
         // The cursor, as the text box does: the page's own screen point is not in DIPs on every display setup.
@@ -412,7 +420,19 @@ function start(): void {
     if (on && !roomPolls) {
       roomPolls = new RoomPolls({
         room, now: Date.now, randomId: () => randomBytes(4).toString('hex'),
-        onView: (poll) => poll ? panels.showPoll({ ...panelState('poll', null), poll }) : panels.hidePoll(),
+        onView: (poll) => {
+          if (!poll) {
+            visiblePollId = null;
+            panels.hidePoll();
+            return;
+          }
+          const state = { ...panelState('poll', null), poll };
+          if (poll.id !== visiblePollId) {
+            visiblePollId = poll.id;
+            panels.showPoll(state);
+          } else panels.updatePoll(state);
+          if (poll.over) panels.minimizePoll(poll.id);
+        },
         onResult: (poll) => {
           const t = text();
           const options = poll.mode === 'yesno' ? [t.voteYes, t.voteNo] : poll.options;
@@ -526,7 +546,17 @@ function start(): void {
       case 'unknown':
         return 'unknown';
       case 'poll':
-        return roomPolls ? 'poll' : 'votesOff';
+        if (!roomPolls) return 'votesOff';
+        const currentPoll = roomPolls.current();
+        if (currentPoll && !currentPoll.over) {
+          panels.showPoll({ ...panelState('poll', null), poll: currentPoll });
+          return 'sent';
+        }
+        return 'poll';
+      case 'spinwheel':
+        return 'spinwheel';
+      case 'spin':
+        return settings.spinWheel.length >= 2 ? 'spin' : 'invalidSpinWheel';
       case 'ff':
       case 'ready':
         if (!roomVotes) return 'votesOff';
@@ -545,7 +575,13 @@ function start(): void {
     if (!featureOn(settings, 'roomVotes') || !roomPolls) return 'votesOff';
     const result = roomPolls.start(poll);
     return result === 'started' ? 'sent' : result === 'busy' ? 'busy' : 'invalidPoll';
-  });
+  }, (choices) => {
+    store.update({ spinWheel: choices });
+    return true;
+  }, () => {
+    const index = chooseSpinIndex(settings.spinWheel, randomInt);
+    return index === null ? null : { index, label: settings.spinWheel[index].label };
+  }, (selection, point) => sendOwnText(text().spinResult(selection.label), point));
   onTextWindowGone(() => {
     textOpen = false;
     syncSuspended();
@@ -559,6 +595,7 @@ function start(): void {
       openTextWindow(screen.getCursorScreenPoint(), {
         lang: resolveLang(settings.language, app.getLocale()),
         placeholder: t.textBoxPlaceholder, hint: t.textBoxHint, unknown: t.textBoxUnknown, votesOff: t.textBoxVotesOff,
+        spinChoices: settings.spinWheel.map((choice) => ({ ...choice })),
       });
     } catch (err) {
       // No window will ever close to release the suspend, so release it here.

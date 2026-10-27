@@ -11,6 +11,13 @@ describe('parsePanelAction', () => {
     for (const choices of [[], [1, 1], [6], ['1']]) expect(parsePanelAction({ ...action, choices })).toBeNull();
   });
 
+  it('validates poll minimize actions against the active poll id shape', () => {
+    expect(parsePanelAction({ t: 'pollMinimize', id: 'abcdef01' })).toEqual({ t: 'pollMinimize', id: 'abcdef01' });
+    expect(parsePanelAction({ t: 'pollMinimize', id: 'not-an-id' })).toBeNull();
+    expect(parsePanelAction({ t: 'pollRestore', id: 'abcdef01' })).toEqual({ t: 'pollRestore', id: 'abcdef01' });
+    expect(parsePanelAction({ t: 'pollRestore', id: 'not-an-id' })).toBeNull();
+  });
+
   it('accepts only well-formed panel actions', () => {
     expect(parsePanelAction({ t: 'alive', peer })).toEqual({ t: 'alive', peer });
     expect(parsePanelAction({ t: 'mute', peer, on: true })).toEqual({ t: 'mute', peer, on: true });

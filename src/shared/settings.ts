@@ -12,6 +12,7 @@ import type { Platform } from './platform';
 import { isTagColor, isTagRgb, readableTagRgb, type TagRgb } from './roomColors';
 import { parseRoomCode } from './roomCode';
 import { sanitizeName } from './roomProtocol';
+import { normalizeSpinWheel, type SpinChoice } from './spinWheel';
 import { isVersion } from './update';
 import { isValidWheel } from './wheelLayout';
 
@@ -89,6 +90,8 @@ export interface Settings {
   features: Features;
   /** How room text appears here: a bubble at the spot the sender pointed at, or a line scrolling across the top. */
   roomTextStyle: RoomTextStyle;
+  /** Local entries and relative weights for the room's persistent spin wheel. */
+  spinWheel: SpinChoice[];
 }
 
 /** Per-machine defaults for the room profile: the OS username and a random tag colour. */
@@ -138,6 +141,7 @@ export const DEFAULT_SETTINGS: Settings = {
   updateNotifiedVersion: null,
   features: { ...DEFAULT_FEATURES },
   roomTextStyle: 'spot',
+  spinWheel: [],
 };
 
 export const LIMITS = {
@@ -340,6 +344,7 @@ export function normalizeSettings(raw: unknown, platform: Platform = 'win', iden
     updateNotifiedVersion: isVersion(r.updateNotifiedVersion) ? r.updateNotifiedVersion : null,
     features: normalizeFeatures(r.features),
     roomTextStyle: r.roomTextStyle === 'danmaku' ? 'danmaku' : 'spot',
+    spinWheel: normalizeSpinWheel(r.spinWheel),
   };
 }
 

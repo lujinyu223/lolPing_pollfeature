@@ -9,6 +9,17 @@ export function renderPoll(root: HTMLElement, state: PanelState, act: (action: P
     delete root.dataset.poll;
     return;
   }
+  if (state.pollMinimized) {
+    const dock = el('section', 'poll-minimized');
+    const question = el('span', 'poll-minimized-question', poll.question);
+    question.title = poll.question;
+    const restore = el('button', 'poll-restore', strings(state.lang).pollRestore);
+    restore.type = 'button';
+    restore.addEventListener('click', () => act({ t: 'pollRestore', id: poll.id }));
+    dock.append(question, restore);
+    root.replaceChildren(dock);
+    return;
+  }
   const selected = root.dataset.poll === poll.id
     ? [...root.querySelectorAll<HTMLInputElement>('input:checked')].map((input) => Number(input.value)) : [];
   root.dataset.poll = poll.id;
@@ -19,7 +30,15 @@ export function renderPoll(root: HTMLElement, state: PanelState, act: (action: P
   const options = poll.mode === 'yesno' ? [t.voteYes, t.voteNo] : poll.options;
   const section = el('section', 'poll-widget lol-frame');
   const starter = state.room.members.find((member) => member.peer === poll.starter)?.name ?? '?';
-  section.append(el('h1', '', poll.question), el('p', 'poll-meta', t.voteStartedBy(starter)));
+  const header = el('header', 'poll-header');
+  const heading = el('h1', '', poll.question);
+  const minimize = el('button', 'poll-minimize', '−');
+  minimize.type = 'button';
+  minimize.title = t.pollMinimize;
+  minimize.setAttribute('aria-label', t.pollMinimize);
+  minimize.addEventListener('click', () => act({ t: 'pollMinimize', id: poll.id }));
+  header.append(heading, minimize);
+  section.append(header, el('p', 'poll-meta', t.voteStartedBy(starter)));
   const form = el('form', 'poll-choices');
   for (const [index, option] of options.entries()) {
     const label = el('label', 'poll-choice');

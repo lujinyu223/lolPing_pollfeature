@@ -5,6 +5,9 @@ const api: TextApi = {
   // Inlined: a sandboxed preload can require electron, but not a generated sibling chunk.
   submit: (text) => ipcRenderer.invoke('text:submit', text),
   startPoll: (poll) => ipcRenderer.invoke('text:poll', poll),
+  saveSpinWheel: (choices) => ipcRenderer.invoke('text:spinwheel', choices),
+  startSpin: () => ipcRenderer.invoke('text:spin'),
+  finishSpin: () => ipcRenderer.invoke('text:spin-result'),
   cancel: () => ipcRenderer.send('text:cancel'),
   strings: () => ipcRenderer.invoke('text:strings'),
 };

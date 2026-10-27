@@ -33,10 +33,15 @@ export class RoomPolls {
     return 'started';
   }
 
-  answer(id: string, choices: number[]): void {
-    if (!this.tally.answer(this.deps.room.self, id, choices)) return;
+  answer(id: string, choices: number[]): boolean {
+    if (!this.tally.answer(this.deps.room.self, id, choices)) return false;
     this.deps.room.sendPollBallot(id, choices);
     this.push();
+    return true;
+  }
+
+  current(): PollView | null {
+    return this.tally.view();
   }
 
   stop(): void {

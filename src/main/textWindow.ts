@@ -1,8 +1,9 @@
 import { BrowserWindow, ipcMain, screen } from 'electron';
-import { TEXT_CH, type Point, type TextAnswer, type TextBoxText } from '../shared/ipc';
+import { TEXT_CH, type Point, type TextAnswer, type TextBoxText, type TextSpinSelection } from '../shared/ipc';
 import { placeInside } from './coords';
 import { IS_MAC, loadPage, pageUrl, preloadPath } from './paths';
 import { normalizePoll, type PollDefinition } from '../shared/pollTally';
+import { normalizeSpinWheel, type SpinChoice } from '../shared/spinWheel';
 
 /** The box's size in DIPs. */
 const WIDTH = 420;
@@ -15,6 +16,9 @@ let at: Point = { x: 0, y: 0 };
 let text: TextBoxText | null = null;
 let submit: ((raw: string, at: Point) => TextAnswer) | null = null;
 let creatingPoll = false;
+let editingSpinWheel = false;
+let spinningWheel = false;
+let selectedSpin: TextSpinSelection | null = null;
 const goneListeners: Array<() => void> = [];
 
 export function onTextWindowGone(cb: () => void): void {
@@ -30,6 +34,9 @@ export function closeTextWindow(): void {
 export function registerTextWindow(
   onSubmit: (raw: string, at: Point) => TextAnswer,
   onPoll: (poll: PollDefinition) => TextAnswer,
+  onSaveSpinWheel: (choices: SpinChoice[]) => boolean,
+  onSpin: () => TextSpinSelection | null,
+  onSpinResult: (selection: TextSpinSelection, at: Point) => void,
 ): void {
   submit = onSubmit;
   ipcMain.handle(TEXT_CH.submit, (event, raw: unknown): TextAnswer => {
@@ -38,6 +45,13 @@ export function registerTextWindow(
     if (answer === 'poll') {
       creatingPoll = true;
       const size = { width: WIDTH, height: 470 };
+      win.setBounds({ ...placeInside(at, size, screen.getDisplayNearestPoint(at).workArea), ...size });
+    }
+    if (answer === 'spinwheel' || answer === 'spin') {
+      editingSpinWheel = answer === 'spinwheel';
+      spinningWheel = answer === 'spin';
+      selectedSpin = null;
+      const size = { width: WIDTH, height: 490 };
       win.setBounds({ ...placeInside(at, size, screen.getDisplayNearestPoint(at).workArea), ...size });
     }
     if (answer === 'sent') win.close();
@@ -50,6 +64,24 @@ export function registerTextWindow(
     const answer = onPoll(poll);
     if (answer === 'sent') win.close();
     return answer;
+  });
+  ipcMain.handle(TEXT_CH.spinWheel, (event, raw: unknown): TextAnswer => {
+    if (win?.webContents !== event.sender || !editingSpinWheel) return 'unknown';
+    const choices = normalizeSpinWheel(raw);
+    if (choices.length < 2) return 'invalidSpinWheel';
+    if (!onSaveSpinWheel(choices)) return 'invalidSpinWheel';
+    win.close();
+    return 'sent';
+  });
+  ipcMain.handle(TEXT_CH.spin, (event): TextSpinSelection | null => {
+    if (win?.webContents !== event.sender || !spinningWheel) return null;
+    selectedSpin = onSpin();
+    return selectedSpin;
+  });
+  ipcMain.handle(TEXT_CH.spinResult, (event): void => {
+    if (win?.webContents !== event.sender || !spinningWheel || !selectedSpin) return;
+    onSpinResult(selectedSpin, at);
+    win.close();
   });
   ipcMain.on(TEXT_CH.cancel, (event) => {
     if (win?.webContents === event.sender) win.close();
@@ -67,6 +99,9 @@ export function openTextWindow(point: Point, strings: TextBoxText): void {
   at = point;
   text = strings;
   creatingPoll = false;
+  editingSpinWheel = false;
+  spinningWheel = false;
+  selectedSpin = null;
   const spot = placeInside(point, { width: WIDTH, height: HEIGHT }, screen.getDisplayNearestPoint(point).workArea);
   const w = new BrowserWindow({
     ...spot,
@@ -99,7 +134,13 @@ export function openTextWindow(point: Point, strings: TextBoxText): void {
 
 function setup(w: BrowserWindow): void {
   w.on('closed', () => {
-    if (win === w) win = null;
+    if (win === w) {
+      win = null;
+      creatingPoll = false;
+      editingSpinWheel = false;
+      spinningWheel = false;
+      selectedSpin = null;
+    }
     for (const cb of goneListeners) cb();
   });
   w.setAlwaysOnTop(true, 'screen-saver'); // above the overlay and a game's borderless window

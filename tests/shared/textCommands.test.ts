@@ -24,6 +24,13 @@ describe('parseTextInput', () => {
     expect(parseTextInput('///poll')).toEqual({ kind: 'unknown' });
   });
 
+  it('opens the persistent spin-wheel editor and spins the saved wheel', () => {
+    expect(parseTextInput('//spinwheel')).toEqual({ kind: 'spinwheel' });
+    expect(parseTextInput('/SPINWHEEL')).toEqual({ kind: 'spinwheel' });
+    expect(parseTextInput('//spin')).toEqual({ kind: 'spin' });
+    expect(parseTextInput('//spin now')).toEqual({ kind: 'unknown' });
+  });
+
   it('calls any other slash word unknown', () => {
     expect(parseTextInput('/remake')).toEqual({ kind: 'unknown' });
     expect(parseTextInput('/')).toEqual({ kind: 'unknown' });

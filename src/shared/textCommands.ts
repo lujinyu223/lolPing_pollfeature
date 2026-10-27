@@ -7,6 +7,8 @@ export type TextInput =
   | { kind: 'noff' }
   | { kind: 'ready' }
   | { kind: 'poll' }
+  | { kind: 'spinwheel' }
+  | { kind: 'spin' }
   | { kind: 'unknown' }
   | { kind: 'empty' };
 
@@ -25,6 +27,10 @@ export function parseTextInput(raw: string): TextInput {
       return { kind: 'ready' };
     case '/poll':
       return { kind: 'poll' };
+    case '/spinwheel':
+      return { kind: 'spinwheel' };
+    case '/spin':
+      return { kind: 'spin' };
     default:
       return { kind: 'unknown' };
   }

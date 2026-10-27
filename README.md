@@ -163,7 +163,7 @@ npm run dev
 
 ### Releasing
 
-Bump `version` in `package.json`, commit, then push a tag that is exactly `v` followed by that version. For example, version `0.5.4` needs tag `v0.5.4`, not `v0.5.0.4`. Check the expected tag before creating it:
+Bump `version` in `package.json`, commit, then push a tag that is exactly `v` followed by that version. For example, version `0.5.6` needs tag `v0.5.6`, not `v0.5.0.6`. Check the expected tag before creating it:
 
 ```bash
 node -p "'v' + require('./package.json').version"

@@ -11,7 +11,7 @@ type View = PanelState['view'];
 const ALLOWED: Record<View, ReadonlySet<PanelAction['t']>> = {
   vote: new Set(['ballot']),
   roster: new Set(['alive', 'mute', 'kick', 'vote']),
-  poll: new Set(['pollBallot']),
+  poll: new Set(['pollBallot', 'pollMinimize', 'pollRestore']),
 };
 
 interface Slot {
@@ -21,9 +21,10 @@ interface Slot {
   state: PanelState | null;
   /** The window should be on screen: it shows once its page has loaded. */
   shown: boolean;
+  restoreBounds: Rect | null;
 }
 
-const emptySlot = (): Slot => ({ win: null, loaded: false, state: null, shown: false });
+const emptySlot = (): Slot => ({ win: null, loaded: false, state: null, shown: false, restoreBounds: null });
 
 /**
  * The roster and the vote widget: two small windows that take clicks without taking focus, so the game or editor
@@ -49,11 +50,43 @@ export class PanelWindows extends EventEmitter {
   }
 
   showPoll(state: PanelState): void {
+    const slot = this.slots.poll;
+    const samePoll = slot.state?.poll?.id === state.poll?.id;
+    if (slot.state?.pollMinimized && samePoll) {
+      slot.state = { ...state, pollMinimized: false };
+      this.restorePollWindow(slot);
+      return;
+    }
+    if (!samePoll) slot.restoreBounds = null;
     this.show('poll', centredIn({ width: 380, height: 440 }, screen.getPrimaryDisplay().workArea), state);
+  }
+
+  updatePoll(state: PanelState): void {
+    this.update({ ...state, pollMinimized: this.slots.poll.state?.pollMinimized ?? false });
   }
 
   hidePoll(): void {
     this.hide('poll');
+  }
+
+  minimizePoll(id: string): void {
+    const slot = this.slots.poll;
+    const w = slot.win;
+    if (!w || w.isDestroyed() || slot.state?.poll?.id !== id || slot.state.pollMinimized) return;
+    slot.restoreBounds = w.getBounds();
+    slot.state = { ...slot.state, pollMinimized: true };
+    const work = screen.getDisplayMatching(slot.restoreBounds).workArea;
+    const width = 300;
+    const height = 56;
+    const margin = 16;
+    w.setBounds({ x: work.x + work.width - width - margin, y: work.y + work.height - height - margin, width, height });
+    this.push(slot);
+    this.reveal(w);
+  }
+
+  restorePoll(id: string): void {
+    const slot = this.slots.poll;
+    if (slot.state?.poll?.id === id && slot.state.pollMinimized) this.restorePollWindow(slot);
   }
 
   /** Centred on the display under `at`, the cursor. */
@@ -84,10 +117,12 @@ export class PanelWindows extends EventEmitter {
 
   private show(view: View, rect: Rect, state: PanelState): void {
     const slot = this.slots[view];
+    const changedPoll = view === 'poll' && slot.state?.poll?.id !== state.poll?.id;
     slot.state = state;
     slot.shown = true;
-    const w = slot.win && !slot.win.isDestroyed() ? slot.win : this.create(view, slot, rect);
-    w.setBounds(rect);
+    const existing = slot.win && !slot.win.isDestroyed() ? slot.win : null;
+    const w = existing ?? this.create(view, slot, rect);
+    if (!existing || view !== 'poll' || changedPoll) w.setBounds(rect);
     if (!slot.loaded) return; // 'did-finish-load' sends the state and shows the window
     this.push(slot);
     this.reveal(w);
@@ -96,11 +131,25 @@ export class PanelWindows extends EventEmitter {
   private hide(view: View): void {
     const slot = this.slots[view];
     slot.shown = false;
+    if (view === 'poll') slot.restoreBounds = null;
     if (!slot.win || slot.win.isDestroyed()) return;
     // The window is reused: clear what it drew, so the next show can't flash this vote's card before its own.
     if (view === 'vote' && slot.state) slot.win.webContents.send(PANEL_CH.state, { ...slot.state, vote: null, voteOver: false });
     if (view === 'poll' && slot.state) slot.win.webContents.send(PANEL_CH.state, { ...slot.state, poll: null });
     slot.win.hide();
+  }
+
+  private restorePollWindow(slot: Slot): void {
+    const w = slot.win;
+    const state = slot.state;
+    if (!w || w.isDestroyed() || !state) return;
+    slot.state = { ...state, pollMinimized: false };
+    slot.shown = true;
+    const bounds = slot.restoreBounds;
+    slot.restoreBounds = null;
+    if (bounds) w.setBounds(bounds);
+    this.push(slot);
+    this.reveal(w);
   }
 
   private push(slot: Slot): void {
