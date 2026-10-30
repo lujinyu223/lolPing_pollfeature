@@ -85,6 +85,15 @@ describe('startRoomText', () => {
     expect(shown).toEqual([]);
   });
 
+  it('keeps a spin result in history without showing a duplicate text popup', () => {
+    const { room, shown, history } = setup();
+    room.emit('remoteText', spoken({ text: 'Spin result: Farm', spin: { id: '1234567890abcdef', index: 1 } }));
+    expect(shown).toEqual([]);
+    expect(history.lines()).toEqual([
+      { at: 1234, kind: 'text', tag: { name: 'Alex', color: 2, rgb: [10, 20, 30] }, text: 'Spin result: Farm' },
+    ]);
+  });
+
   it('stops listening when stopped', () => {
     const { room, shown, history, stop } = setup();
     stop();

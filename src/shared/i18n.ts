@@ -312,6 +312,7 @@ const en = {
   spinWheelInvalid: 'Add at least two choices.',
   spinWheelEmpty: 'Set up the wheel first with //spinwheel.',
   spinResult: (choice: string) => `Spin result: ${choice}`,
+  spinHostTimeout: 'Host timed out',
   pollMinimize: 'Minimize poll',
   pollRestore: 'Return to poll',
 
@@ -678,6 +679,7 @@ const zh: Strings = {
   spinWheelInvalid: '请至少填写两个选项。',
   spinWheelEmpty: '请先使用 //spinwheel 设置轮盘。',
   spinResult: (choice) => `轮盘结果：${choice}`,
+  spinHostTimeout: '主机超时',
   pollMinimize: '最小化投票',
   pollRestore: '返回投票',
 

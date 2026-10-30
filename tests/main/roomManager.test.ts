@@ -3,7 +3,7 @@ import {
   makeIdentity, open, peerIdOf, publicKeyOf, seal, signBody, verifyBody, type RoomIdentity, type RoomKeys,
 } from '../../src/main/roomCrypto';
 import {
-  MAX_MEMBERS, RoomManager, type RemoteEmote, type RemotePing, type RemoteText, type RoomToast,
+  MAX_MEMBERS, RoomManager, type RemoteEmote, type RemotePing, type RemoteSpinResult, type RemoteSpinStart, type RemoteText, type RoomToast,
 } from '../../src/main/roomManager';
 import { formatRoomCode, makeRoomCode } from '../../src/shared/roomCode';
 import type { TagRgb } from '../../src/shared/roomColors';
@@ -77,6 +77,8 @@ let profile: { name: string; color: number; rgb: TagRgb | null; limit: number; n
 let pings: RemotePing[];
 let emotes: RemoteEmote[];
 let texts: RemoteText[];
+let spinStarts: RemoteSpinStart[];
+let spinResults: RemoteSpinResult[];
 let toasts: RoomToast[];
 let saved: (string | null)[];
 
@@ -98,6 +100,8 @@ beforeEach(() => {
   pings = [];
   emotes = [];
   texts = [];
+  spinStarts = [];
+  spinResults = [];
   toasts = [];
   saved = [];
   room = new RoomManager({
@@ -113,6 +117,8 @@ beforeEach(() => {
   room.on('remotePing', (p: RemotePing) => pings.push(p));
   room.on('remoteEmote', (p: RemoteEmote) => emotes.push(p));
   room.on('remoteText', (p: RemoteText) => texts.push(p));
+  room.on('remoteSpinStart', (p: RemoteSpinStart) => spinStarts.push(p));
+  room.on('remoteSpinResult', (p: RemoteSpinResult) => spinResults.push(p));
   room.on('toast', (t: RoomToast) => toasts.push(t));
   room.on('saveCode', (c: string | null) => saved.push(c));
 });
@@ -1161,6 +1167,52 @@ describe('room text and votes', () => {
     room.sendText('hello', { d: 1, x: 0, y: 0 });
     room.sendBallot('0a1b2c3d', true);
     expect(lan.sent).toHaveLength(0);
+  });
+
+  it('sends room spin choices first and sends the selected index with the result text', async () => {
+    await joinActive();
+    const alex = new Remote('1111111111111111', 'lan:a', lan);
+    alex.presence();
+    lan.sent = [];
+    const choices = [{ label: 'Push', weight: 2 }, { label: 'Farm', weight: 1 }];
+    const id = room.sendSpinStart(choices);
+    expect(id).toBe('ab'.repeat(8));
+    if (!id) throw new Error('spin start did not return an id');
+    room.sendSpinResult('Spin result: Farm', id, 1, { d: 1, x: 0.5, y: 0.25 });
+    expect(sentMessages('lan:a')).toMatchObject([
+      { t: 'spinStart', id, choices },
+      { t: 'text', text: 'Spin result: Farm', spin: { id, index: 1 } },
+    ]);
+    lan.sent = [];
+    const oversized = Array.from({ length: 32 }, () => ({ label: '😀'.repeat(50), weight: 1 }));
+    expect(room.sendSpinStart(oversized)).toBeNull();
+    expect(lan.sent).toHaveLength(0);
+  });
+
+  it('starts a remote spin and matches its result text to the spin id', async () => {
+    await joinActive();
+    const alex = new Remote('1111111111111111', 'lan:a', lan);
+    alex.presence({ name: 'Alex' });
+    const id = '1234567890abcdef';
+    const choices = [{ label: 'Push', weight: 2 }, { label: 'Farm', weight: 1 }];
+    lan.deliver(alex.key, alex.packet({ t: 'spinStart', id, choices }));
+    expect(spinStarts).toMatchObject([{ peer: alex.peer, id, choices, tag: { name: 'Alex' } }]);
+
+    alex.text({ text: 'Spin result: Farm', spin: { id, index: 1 } });
+    expect(spinResults).toMatchObject([{ peer: alex.peer, id, index: 1, text: 'Spin result: Farm' }]);
+    expect(texts.at(-1)).toMatchObject({ spin: { id, index: 1 }, text: 'Spin result: Farm' });
+  });
+
+  it('does not present a room spin from a member who switched text off', async () => {
+    await joinActive();
+    const alex = new Remote('1111111111111111', 'lan:a', lan);
+    alex.presence({ nf: ['text'] });
+    lan.deliver(alex.key, alex.packet({
+      t: 'spinStart', id: '1234567890abcdef', choices: [{ label: 'Push', weight: 1 }, { label: 'Farm', weight: 1 }],
+    }));
+    expect(spinStarts).toEqual([]);
+    alex.text({ text: 'Spin result: Farm', spin: { id: '1234567890abcdef', index: 1 } });
+    expect(spinResults).toEqual([]);
   });
 });
 

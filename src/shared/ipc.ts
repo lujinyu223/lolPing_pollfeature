@@ -44,13 +44,15 @@ export interface OverlayEvents {
   'toast:show': { title: string; body: string };
   /** `owner` is 'self' or a room member: each owner has at most 3 lines on screen. */
   'text:spawn': Point & { text: string; owner: string; style: RoomTextStyle; tag?: PingTag };
+  'spin:start': { owner: string; id: string; choices: SpinChoice[]; tag: PingTag; timeoutText: string };
+  'spin:result': { owner: string; id: string; index: number; text: string; tag: PingTag };
 }
 
 export type OverlayChannel = keyof OverlayEvents;
 
 export const OVERLAY_CHANNELS: readonly OverlayChannel[] = [
   'overlay:settings', 'wheel:open', 'wheel:move', 'wheel:release', 'wheel:cancel', 'ping:spawn', 'ping:unkeep', 'emote:spawn', 'emote:clear',
-  'toast:show', 'text:spawn',
+  'toast:show', 'text:spawn', 'spin:start', 'spin:result',
 ];
 
 export const TEXT_CH = {
@@ -77,6 +79,7 @@ export type TextAnswer = 'sent' | 'unknown' | 'votesOff' | 'poll' | 'invalidPoll
 export interface TextSpinSelection {
   index: number;
   label: string;
+  roomSpinId: string | null;
 }
 
 export interface TextApi {

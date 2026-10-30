@@ -6,7 +6,7 @@ import {
 import {
   clampNameInput, decodeMessage, decodeSigned, encodeMessage, joinSigned, splitSigned, isOlderThan, isVoteId, MAX_TEXT, sanitizeName, sanitizeText, validateMessage,
   type AliveMsg, type BallotMsg, type ChunkMsg, type EmoteMsg, type PingMsg, type PresenceMsg, type RoomMessage, type TextMsg,
-  type VoteMsg, type WantMsg,
+  type SpinStartMsg, type VoteMsg, type WantMsg,
 } from '../../src/shared/roomProtocol';
 
 const base = { peer: '0123456789abcdef', seq: 4, ts: 1_780_000_000_000 };
@@ -14,10 +14,13 @@ const presence: PresenceMsg = { ...base, t: 'presence', proto: 1, app: '0.3.0', 
 const ping: PingMsg = { ...base, t: 'ping', ping: 'danger', d: 2, x: 0.25, y: 1 };
 const emote: EmoteMsg = { ...base, t: 'emote', e: 'gg', d: 2, x: 0.25, y: 1 };
 const text: TextMsg = { ...base, t: 'text', text: 'Group mid', d: 2, x: 0.25, y: 1 };
+const spinStart: SpinStartMsg = {
+  ...base, t: 'spinStart', id: 'fedcba9876543210', choices: [{ label: 'Push', weight: 2 }, { label: 'Farm', weight: 1 }],
+};
 const CUSTOM_REF = `c:${'0123456789abcdef'.repeat(2)}`;
 
 describe('encode / decode', () => {
-  it.each<RoomMessage>([presence, ping, emote, text, { ...base, t: 'bye' }])('round-trips $t', (m) => {
+  it.each<RoomMessage>([presence, ping, emote, text, spinStart, { ...base, t: 'bye' }])('round-trips $t', (m) => {
     expect(decodeMessage(encodeMessage(m))).toEqual(m);
   });
 
@@ -39,6 +42,23 @@ describe('encode / decode', () => {
 });
 
 describe('text messages', () => {
+  it('carries compatible spin metadata on a result text', () => {
+    const result = { ...text, spin: { id: spinStart.id, index: 1 } };
+    expect(decodeMessage(encodeMessage(result))).toEqual(result);
+    expect(validateMessage({ ...result, spin: { id: 'bad', index: 1 } })).toEqual(text);
+  });
+
+  it('validates spin starts and bounds the wheel choices', () => {
+    expect(validateMessage(spinStart)).toEqual(spinStart);
+    for (const choices of [
+      [{ label: 'Only one', weight: 1 }],
+      [{ label: 'A', weight: 0 }, { label: 'B', weight: 1 }],
+      [{ label: 'A'.repeat(51), weight: 1 }, { label: 'B', weight: 1 }],
+      Array.from({ length: 33 }, () => ({ label: 'Choice', weight: 1 })),
+    ]) expect(validateMessage({ ...spinStart, choices })).toBeNull();
+    expect(validateMessage({ ...spinStart, id: 'bad' })).toBeNull();
+  });
+
   it('validates polls and ballots without changing existing vote messages', () => {
     const poll = { ...base, t: 'poll', id: 'abcdef01', mode: 'single', question: 'Map?', options: ['A', 'B'] };
     expect(validateMessage(poll)).toEqual(poll);

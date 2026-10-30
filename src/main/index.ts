@@ -336,6 +336,12 @@ function start(): void {
   room.on('remoteEmote', (p) => {
     if (featureOn(settings, 'emotes')) overlays.spawnRemoteEmote(p);
   });
+  room.on('remoteSpinStart', (p) => {
+    if (featureOn(settings, 'roomText')) overlays.spawnRemoteSpin({ ...p, timeoutText: text().spinHostTimeout });
+  });
+  room.on('remoteSpinResult', (p) => {
+    if (featureOn(settings, 'roomText')) overlays.finishRemoteSpin(p);
+  });
   overlays.on('sharedEmote', (p: SharedEmote) => {
     const shared = toShared(overlays.numbered(), p.displayId, p.x, p.y);
     // The effect rides on the message, so friends see the one its sender picked even before they have the image.
@@ -525,10 +531,13 @@ function start(): void {
   };
   const ownTag = () => ({ name: settings.displayName, ...tagWire(settings.tagColor, settings.tagColorCustom) });
   /** Shows our own text where the box was opened, and sends it to the room. */
-  const sendOwnText = (message: string, at: { x: number; y: number }): void => {
+  const sendOwnText = (message: string, at: { x: number; y: number }, spin?: { id: string; index: number }): void => {
     const { shared, ...spot } = ownSpot(at);
     postLine(lineDeps, { kind: 'text', owner: 'self', tag: ownTag(), ...spot, text: message });
-    if (shared) room.sendText(message, shared);
+    if (shared) {
+      if (spin) room.sendSpinResult(message, spin.id, spin.index, shared);
+      else room.sendText(message, shared);
+    }
   };
   /** "<name> - Alive" for the member whose name tag was clicked in the panel, shown here and sent to the room. */
   const sendOwnAlive = (peer: string, at: { x: number; y: number }): void => {
@@ -581,8 +590,13 @@ function start(): void {
     return true;
   }, () => {
     const index = chooseSpinIndex(settings.spinWheel, randomInt);
-    return index === null ? null : { index, label: settings.spinWheel[index].label };
-  }, (selection, point) => sendOwnText(text().spinResult(selection.label), point));
+    return index === null ? null : {
+      index, label: settings.spinWheel[index].label, roomSpinId: room.sendSpinStart(settings.spinWheel),
+    };
+  }, (selection, point) => sendOwnText(
+    text().spinResult(selection.label), point,
+    selection.roomSpinId ? { id: selection.roomSpinId, index: selection.index } : undefined,
+  ));
   onTextWindowGone(() => {
     textOpen = false;
     syncSuspended();

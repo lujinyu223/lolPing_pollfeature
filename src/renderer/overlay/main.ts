@@ -14,6 +14,7 @@ import '../shared/emoteFx.css';
 import { EmoteStage } from './emoteStage';
 import { spawnPing } from './pingFx';
 import { SoundBank } from './soundBank';
+import { SpinStage } from './spinStage';
 import { showToast } from './toast';
 import { TextStage } from './textFx';
 import { Wheel } from './wheel';
@@ -35,6 +36,10 @@ pingLayer.after(emoteLayer);
 const sounds = new SoundBank();
 const stage = new EmoteStage(emoteLayer);
 const texts = new TextStage(textLayer);
+const spinLayer = document.createElement('div');
+spinLayer.id = 'spins';
+document.body.append(spinLayer);
+const spins = new SpinStage(spinLayer);
 let settings: OverlaySettings = overlaySettings(DEFAULT_SETTINGS);
 const [fallbackPing] = pingsFor([DEFAULT_CLICK_PING]);
 const volume = (): number => soundLevel(settings);
@@ -119,6 +124,8 @@ window.overlay.on('emote:spawn', (p) => emote(p.owner, p.art, p.x, p.y, p.tag));
 window.overlay.on('emote:clear', (p) => stage.clear(p.owner));
 window.overlay.on('toast:show', (t) => showToast(toastLayer, t.title, t.body));
 window.overlay.on('text:spawn', (t) => texts.spawn(t));
+window.overlay.on('spin:start', (p) => spins.start(p));
+window.overlay.on('spin:result', (p) => spins.result(p));
 
 /** Resolves with `label` when the image at `url` doesn't load. */
 const probe = (url: string, label: string): Promise<string | null> =>

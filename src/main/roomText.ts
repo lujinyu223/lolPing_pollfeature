@@ -37,7 +37,11 @@ export function startRoomText(deps: RoomTextDeps): () => void {
   const onText = (p: RemoteText): void => {
     const common = { owner: p.peer, tag: p.tag, displayId: p.displayId, x: p.x, y: p.y };
     if (p.kind === 'text') {
-      if (p.text !== undefined) postLine(deps, { ...common, kind: 'text', text: p.text });
+      if (p.text !== undefined) {
+        const line = { at: deps.now(), kind: 'text' as const, tag: { name: p.tag.name, color: p.tag.color, rgb: p.tag.rgb }, text: p.text };
+        if (p.spin) deps.history.push(line);
+        else postLine(deps, { ...common, kind: 'text', text: p.text });
+      }
       return;
     }
     // The line is written here, in our language, with the name of the member they clicked.

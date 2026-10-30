@@ -67,9 +67,17 @@ export interface EmoteMsg extends Base {
 export interface TextMsg extends Base {
   t: 'text';
   text: string;
+  /** Present on a spin result so newer peers can stop the matching wheel; older peers ignore it and show the text. */
+  spin?: { id: string; index: number };
   d: number;
   x: number;
   y: number;
+}
+/** Starts a room spin. The result is carried by a compatible `text` message when the sender's animation ends. */
+export interface SpinStartMsg extends Base {
+  t: 'spinStart';
+  id: string;
+  choices: { label: string; weight: number }[];
 }
 /** Added in 0.5.2: a line from the peer `who` to where the sender's cursor is; older apps drop it as an unknown type. */
 export interface AliveMsg extends Base {
@@ -121,7 +129,7 @@ export interface ChunkMsg extends Base {
 export interface ByeMsg extends Base {
   t: 'bye';
 }
-export type RoomMessage = PresenceMsg | PingMsg | EmoteMsg | TextMsg | AliveMsg | VoteMsg | BallotMsg | PollMsg | PollBallotMsg | WantMsg | ChunkMsg | ByeMsg;
+export type RoomMessage = PresenceMsg | PingMsg | EmoteMsg | TextMsg | SpinStartMsg | AliveMsg | VoteMsg | BallotMsg | PollMsg | PollBallotMsg | WantMsg | ChunkMsg | ByeMsg;
 
 // C0/C1 controls, zero-width characters, bidi marks, embeddings and isolates, BOM, line/paragraph separators,
 // soft hyphen, combining grapheme joiner, Arabic letter mark, Mongolian vowel separator and the Hangul fillers
@@ -163,6 +171,9 @@ const B64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const PK_RE = /^[A-Za-z0-9+/]{43}=$/;
 /** The signature tail: 64 raw bytes in base64, as the last field, so a receiver can cut it off and get the signed bytes. */
 const SIG_TAIL_RE = /,"sg":"([A-Za-z0-9+/]{86}==)"}$/;
+const MAX_SPIN_CHOICES = 32;
+const MAX_SPIN_LABEL = 50;
+const MAX_SPIN_WEIGHT = 1000;
 
 /** The announced hashes, rebuilt: well-formed and distinct, the first ANNOUNCED_MAX. Anything else means none. */
 function emList(raw: unknown): string[] {
@@ -180,6 +191,19 @@ function emList(raw: unknown): string[] {
 function nfList(raw: unknown): RoomFeatureOff[] {
   if (!Array.isArray(raw)) return [];
   return FEATURES_OFF.filter((f) => raw.includes(f));
+}
+
+/** A room spin's wheel, rebuilt from bounded labels and weights. */
+function parseSpinChoices(raw: unknown): { label: string; weight: number }[] | null {
+  if (!Array.isArray(raw) || raw.length < 2 || raw.length > MAX_SPIN_CHOICES) return null;
+  const choices: { label: string; weight: number }[] = [];
+  for (const value of raw) {
+    if (!isObj(value) || typeof value.label !== 'string' || !isUint(value.weight)) return null;
+    const label = sanitizeText(value.label);
+    if (!label || [...label].length > MAX_SPIN_LABEL || value.weight < 1 || value.weight > MAX_SPIN_WEIGHT) return null;
+    choices.push({ label, weight: value.weight });
+  }
+  return choices;
 }
 
 /** Builds a fresh message from known fields only, or null when anything is missing or out of range. */
@@ -215,11 +239,20 @@ export function validateMessage(raw: unknown): RoomMessage | null {
       return { t, ...base, e, d: d as number, x, y, ...(isEmoteFx(fx) ? { fx } : {}) };
     }
     case 'text': {
-      const { text, d, x, y } = raw;
+      const { text, d, x, y, spin } = raw;
       if (typeof text !== 'string' || !Number.isInteger(d) || (d as number) < 1 || (d as number) > MAX_DISPLAY) return null;
       if (!isUnit(x) || !isUnit(y)) return null;
       const safe = sanitizeText(text);
-      return safe ? { t, ...base, text: safe, d: d as number, x, y } : null;
+      const spinInfo = isObj(spin) && typeof spin.id === 'string' && PEER_RE.test(spin.id)
+        && isUint(spin.index) && spin.index < MAX_SPIN_CHOICES
+        ? { spin: { id: spin.id, index: spin.index } }
+        : {};
+      return safe ? { t, ...base, text: safe, d: d as number, x, y, ...spinInfo } : null;
+    }
+    case 'spinStart': {
+      const { id, choices } = raw;
+      const parsed = parseSpinChoices(choices);
+      return typeof id === 'string' && PEER_RE.test(id) && parsed ? { t, ...base, id, choices: parsed } : null;
     }
     case 'alive': {
       const { who, d, x, y } = raw;

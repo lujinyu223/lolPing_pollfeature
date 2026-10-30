@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import type { PollDefinition } from '../shared/pollTally';
 import type { EmoteRef } from '../shared/emotes';
 import type { PingId } from '../shared/pings';
+import type { SpinChoice } from '../shared/spinWheel';
 import type { JoinResult, MemberPath, RoomMember, RoomStateCore } from '../shared/room';
 import type { TagRgb } from '../shared/roomColors';
 import { formatRoomCode, makeRoomCode, parseRoomCode } from '../shared/roomCode';
@@ -85,6 +86,22 @@ export interface RemoteText {
   y: number;
   text?: string;
   who?: string;
+  spin?: { id: string; index: number };
+}
+
+export interface RemoteSpinStart {
+  peer: string;
+  id: string;
+  choices: SpinChoice[];
+  tag: MemberTag;
+}
+
+export interface RemoteSpinResult {
+  peer: string;
+  id: string;
+  index: number;
+  text: string;
+  tag: MemberTag;
 }
 
 export type RoomToast =
@@ -135,7 +152,7 @@ interface Member {
 /**
  * The room: who is in it, what we send, and what we let through. Talks to the network only through transports,
  * which carry sealed packets. Events: 'state' (RoomStateCore), 'remotePing' (RemotePing), 'remoteEmote' (RemoteEmote), 'toast' (RoomToast),
- * 'remoteText' (RemoteText: text and alive lines), 'vote' (VoteMsg), 'ballot' (BallotMsg), 'saveCode' (canonical code | null: what "rejoin last room" should remember), 'emotes' (peer, announced hashes),
+ * 'remoteText' (RemoteText: text and alive lines), 'remoteSpinStart' (RemoteSpinStart), 'remoteSpinResult' (RemoteSpinResult), 'vote' (VoteMsg), 'ballot' (BallotMsg), 'saveCode' (canonical code | null: what "rejoin last room" should remember), 'emotes' (peer, announced hashes),
  * 'want' (WantMsg), 'chunk' (ChunkMsg) and 'memberGone' (peer), which EmoteTransfer answers.
  */
 export class RoomManager extends EventEmitter {
@@ -243,6 +260,15 @@ export class RoomManager extends EventEmitter {
     this.sendShared({ t: 'text', text, ...shared });
   }
 
+  sendSpinStart(choices: readonly SpinChoice[]): string | null {
+    const id = Buffer.from(this.deps.randomBytes(8)).toString('hex');
+    return this.sendShared({ t: 'spinStart', id, choices }) ? id : null;
+  }
+
+  sendSpinResult(text: string, id: string, index: number, shared: { d: number; x: number; y: number }): void {
+    this.sendShared({ t: 'text', text, spin: { id, index }, ...shared });
+  }
+
   /** `who` is the member whose name the line shows; the receivers write the words themselves. */
   sendAlive(who: string, shared: { d: number; x: number; y: number }): void {
     this.sendShared({ t: 'alive', who, ...shared });
@@ -274,9 +300,14 @@ export class RoomManager extends EventEmitter {
   }
 
   /** A ping, an emote, text or a vote message: each member gets it over its own route; shared transports get one send, within the relay cap. */
-  private sendShared(body: Record<string, unknown>): void {
-    if (this.phase === 'idle' || !this.keys || this.paused) return;
-    const packet = this.seal(body);
+  private sendShared(body: Record<string, unknown>): boolean {
+    if (this.phase === 'idle' || !this.keys || this.paused) return false;
+    let packet: Buffer;
+    try {
+      packet = this.seal(body);
+    } catch {
+      return false;
+    }
     const sharedRoutes = new Set<Transport>();
     for (const m of this.members.values()) {
       const route = this.route(m);
@@ -285,6 +316,7 @@ export class RoomManager extends EventEmitter {
       else route.transport.sendTo(route.key, packet);
     }
     for (const t of sharedRoutes) if (this.relayCap.allow(t.kind, RELAY_PING_RATE, RELAY_PING_BURST)) t.broadcast(packet);
+    return true;
   }
 
   /** How a member is reached right now, for emote transfers: cheap LAN unicast, one-cast-reaches-all relays, or neither. */
@@ -567,15 +599,27 @@ export class RoomManager extends EventEmitter {
       this.emit('poll', msg);
       return;
     }
+    const tag: MemberTag = { name: m.name, color: m.color, rgb: m.rgb };
+    if (msg.t === 'spinStart') {
+      if (m.textOff || this.deps.profile().nf.includes('text')) return;
+      this.emit('remoteSpinStart', { peer: m.peer, id: msg.id, choices: msg.choices, tag } satisfies RemoteSpinStart);
+      return;
+    }
     if (msg.t === 'alive' && msg.who !== this.self && !this.members.has(msg.who)) return;
+    if (msg.t === 'text' && msg.spin && m.textOff) return;
     const target = this.deps.resolveTarget(msg.d);
     if (!target) return;
     const [x, y] = [msg.x * target.width, msg.y * target.height];
-    const tag: MemberTag = { name: m.name, color: m.color, rgb: m.rgb };
     if (msg.t === 'ping') this.emit('remotePing', { displayId: target.displayId, x, y, id: msg.ping, tag } satisfies RemotePing);
     else if (msg.t === 'emote') this.emit('remoteEmote', { displayId: target.displayId, x, y, ref: msg.e, fx: msg.fx, peer: m.peer, tag } satisfies RemoteEmote);
     else if (msg.t === 'text') {
-      this.emit('remoteText', { kind: 'text', peer: m.peer, tag, displayId: target.displayId, x, y, text: msg.text } satisfies RemoteText);
+      if (msg.spin && !m.textOff && !this.deps.profile().nf.includes('text')) {
+        this.emit('remoteSpinResult', { peer: m.peer, id: msg.spin.id, index: msg.spin.index, text: msg.text, tag } satisfies RemoteSpinResult);
+      }
+      this.emit('remoteText', {
+        kind: 'text', peer: m.peer, tag, displayId: target.displayId, x, y, text: msg.text,
+        ...(msg.spin ? { spin: msg.spin } : {}),
+      } satisfies RemoteText);
     } else if (msg.t === 'alive') {
       this.emit('remoteText', { kind: 'alive', peer: m.peer, tag, displayId: target.displayId, x, y, who: msg.who } satisfies RemoteText);
     }

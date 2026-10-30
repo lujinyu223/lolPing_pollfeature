@@ -7,6 +7,7 @@ import {
 import { isPingId, type PingId } from '../shared/pings';
 import type { HelperEvent, WheelKind } from '../shared/protocol';
 import type { OverlaySettings, RoomTextStyle } from '../shared/settings';
+import type { SpinChoice } from '../shared/spinWheel';
 import { physicalToLocal, type DisplayMap } from './coords';
 import { numberDisplays, type NumberedDisplay } from './displayNumbers';
 import { IS_LINUX, IS_MAC, loadPage, preloadPath } from './paths';
@@ -40,7 +41,9 @@ export const overlayBounds = (d: Display): Rectangle =>
 const mapScale = (d: Display): number => (IS_MAC || IS_LINUX ? 1 : d.scaleFactor);
 
 /** Messages that put something new on an overlay. */
-const RAISING_CHANNELS: ReadonlySet<OverlayChannel> = new Set<OverlayChannel>(['wheel:open', 'ping:spawn', 'emote:spawn', 'toast:show', 'text:spawn']);
+const RAISING_CHANNELS: ReadonlySet<OverlayChannel> = new Set<OverlayChannel>([
+  'wheel:open', 'ping:spawn', 'emote:spawn', 'toast:show', 'text:spawn', 'spin:start', 'spin:result',
+]);
 
 /**
  * One transparent, click-through, always-on-top window per display.
@@ -168,6 +171,18 @@ export class OverlayManager extends EventEmitter {
   spawnText(p: { displayId: number; x: number; y: number; text: string; owner: string; style: RoomTextStyle; tag?: PingTag }): void {
     const { displayId, ...line } = p;
     this.send(displayId, 'text:spawn', line);
+  }
+
+  spawnRemoteSpin(p: { peer: string; id: string; choices: SpinChoice[]; tag: PingTag; timeoutText: string }): void {
+    this.send(screen.getPrimaryDisplay().id, 'spin:start', {
+      owner: p.peer, id: p.id, choices: p.choices, tag: p.tag, timeoutText: p.timeoutText,
+    });
+  }
+
+  finishRemoteSpin(p: { peer: string; id: string; index: number; text: string; tag: PingTag }): void {
+    this.send(screen.getPrimaryDisplay().id, 'spin:result', {
+      owner: p.peer, id: p.id, index: p.index, text: p.text, tag: p.tag,
+    });
   }
 
   /** This machine's displays with their room numbers (#1 = primary). */
