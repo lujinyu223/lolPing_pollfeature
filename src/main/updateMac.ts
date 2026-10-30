@@ -11,6 +11,7 @@ export interface MacBackendDeps {
   /** RELEASES_API, or LOLPING_UPDATE_TEST_URL. */
   apiBase: string;
   currentVersion: string;
+  arch: 'arm64' | 'x64';
   fetch: typeof fetch;
   downloadsDir: string;
   /** Brings lolPing to the front. A menu bar app is not the active app, and a dialog shown from the background can stay hidden. */
@@ -36,7 +37,7 @@ interface DmgAsset {
 
 const noop = (): void => undefined;
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
-const dmgName = (version: string): string => `lolPing-${version}-arm64.dmg`;
+const dmgName = (version: string, arch: 'arm64' | 'x64'): string => `lolPing-${version}-${arch}.dmg`;
 
 function httpUrl(v: unknown): string | null {
   if (typeof v !== 'string') return null;
@@ -79,7 +80,7 @@ export class MacBackend implements UpdateBackend {
     const version = tag.startsWith('v') ? tag.slice(1) : '';
     if (!isVersion(version) || !isNewer(version, this.deps.currentVersion)) return this.noUpdate();
 
-    const wanted = dmgName(version);
+    const wanted = dmgName(version, this.deps.arch);
     const found = assets.find((a): a is Record<string, unknown> => isObj(a) && a.name === wanted);
     if (!found) return this.noUpdate(); // the disk image isn't uploaded (yet): nothing to offer a Mac
     const url = httpUrl(found.browser_download_url);
@@ -171,7 +172,7 @@ export class MacBackend implements UpdateBackend {
     // could stay hidden behind it, with the user left to replace the app that is still running.
     this.deps.focus();
     await this.deps.showDialog(this.deps.dialogText());
-    const failure = await this.deps.openPath(join(this.deps.downloadsDir, dmgName(info.version)));
+    const failure = await this.deps.openPath(join(this.deps.downloadsDir, dmgName(info.version, this.deps.arch)));
     if (failure) throw new Error(failure);
     this.deps.quit();
   }

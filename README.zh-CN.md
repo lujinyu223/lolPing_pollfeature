@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>下载 Windows 版</b></a> ·
-  <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>下载 Mac 版</b></a>（Apple 芯片，实验性） ·
+  <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>下载 Mac 版</b></a>（Apple 芯片和 Intel，实验性） ·
   <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>下载 Linux 版</b></a>（X11，实验性）
 </p>
 
@@ -38,9 +38,9 @@ lolPing 面向 64 位 Windows 11。Windows 10 也许可以用，但没有测试�
 
 ### macOS（实验性）
 
-Mac 版需要 Apple 芯片（M1 或更新）的 Mac 和 macOS 13 或更新版本。它会自动构建和测试，但还没在真实的 Mac 上用过多少。遇到问题请[反馈](https://github.com/lujinyu223/lolPing_pollfeature/issues)。
+Mac 版支持 macOS 13 或更新版本的 Apple 芯片和 Intel Mac。它会自动构建和测试，但还没在真实的 Mac 上用过多少。遇到问题请[反馈](https://github.com/lujinyu223/lolPing_pollfeature/issues)。
 
-1. 从[最新版本](https://github.com/lujinyu223/lolPing_pollfeature/releases/latest)下载 `lolPing-<版本号>-arm64.dmg`，打开后把 lolPing 拖进“应用程序”。
+1. Apple 芯片 Mac 下载 `lolPing-<版本号>-arm64.dmg`，Intel Mac 下载 `lolPing-<版本号>-x64.dmg`。从[最新版本](https://github.com/lujinyu223/lolPing_pollfeature/releases/latest)下载后打开，并把 lolPing 拖进“应用程序”。
 2. 打开 lolPing。它没有经过注册 Apple 开发者的签名，macOS 会提示无法检查其是否包含恶意软件：点“完成”，打开**系统设置 → 隐私与安全性**，向下滚动，在 lolPing 的提示旁点**仍要打开**并确认。
    如果 macOS 提示 lolPing“已损坏”，请在“终端”中运行 `xattr -dr com.apple.quarantine /Applications/lolPing.app`，然后再次打开。
 3. lolPing 会请求**辅助功能**权限，用来读取鼠标和键盘。点“打开系统设置”并打开 lolPing。授权后立即可以发信号。
@@ -144,7 +144,7 @@ Windows 和 macOS 版本在启动 10 秒后向 GitHub 检查一次新版本，�
 需要 Node 22.12 或更新版本，以及：
 
 - **Windows：** Windows 11，以及安装了“使用 C++ 的桌面开发”工作负载的 Visual Studio 2022 或更新版本。
-- **macOS：** 装有 Xcode 命令行工具（`xcode-select --install`）的 Apple 芯片 Mac。请为运行 `npm run dev` 的程序（例如“终端”）开启辅助功能权限，输入助手才能读取输入。
+- **macOS：** 装有 Xcode 命令行工具（`xcode-select --install`）的 Mac。请为运行 `npm run dev` 的程序（例如“终端”）开启辅助功能权限，输入助手才能读取输入。
 
 ```bash
 npm install
@@ -162,6 +162,7 @@ npm run dev
 | `npm run typecheck` | 全量类型检查 |
 | `npm run dist` | 在 `release/` 中生成 Windows 安装程序 |
 | `npm run dist:mac` | 在 `release/` 中生成 Mac 磁盘映像（需在 Mac 上运行） |
+| `npm run dist:mac:x64` | 在 `release/` 中生成 Intel Mac 磁盘映像（需在 Mac 上运行） |
 | `npm run dev:site` | 启动轮盘的浏览器演示页（`site/`） |
 | `npm run media` | 用演示页重新录制 `docs/media/demo.gif` 和 `docs/media/og.png`（需要 ffmpeg） |
 | `node tools/room-peer/run.mjs <房间码>` | 以假成员身份加入房间并随机发信号，一台电脑也能试用房间功能；加 `--relay` 则通过中继加入，加 `--emotes` 则同时发表情（见 [`tools/room-peer`](tools/room-peer)） |
@@ -177,7 +178,7 @@ node -p "'v' + require('./package.json').version"
 
 如果 Release 工作流在“Check the tag matches package.json”步骤失败，请在要发布的提交上推送匹配的标签。重新运行不匹配的标签仍会失败；不要删除这项检查，因为上传文件名也依赖标签与包版本一致。
 
-Release 工作流会先创建草稿 Release，再构建 Windows 安装程序、Mac 磁盘映像、Linux AppImage 和 Debian 包，并附加到 Release。工作流还会附加 `latest.yml` 和 Windows 安装程序的 `.blockmap`，electron-updater 需要这两个文件才能更新已安装的程序。所有平台的安装包都附加完成后，最后一个任务会发布 Release。
+Release 工作流会先创建草稿 Release，再构建 Windows 安装程序、Apple 芯片和 Intel Mac 磁盘映像、Linux AppImage 和 Debian 包，并附加到 Release。工作流还会附加 `latest.yml` 和 Windows 安装程序的 `.blockmap`，electron-updater 需要这两个文件才能更新已安装的程序。所有平台的安装包都附加完成后，最后一个任务会发布 Release。
 
 ## 工作原理
 

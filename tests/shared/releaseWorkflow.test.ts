@@ -29,6 +29,8 @@ describe('release workflow', () => {
     expect(win).toContain('"release/lolPing-Setup-${GITHUB_REF_NAME#v}.exe.blockmap"');
     expect(win).toContain('--clobber');
     expect(job('mac')).toContain('release/lolPing-${GITHUB_REF_NAME#v}-arm64.dmg');
+    expect(job('mac')).toContain('npm run dist:mac:x64');
+    expect(job('mac')).toContain('release/lolPing-${GITHUB_REF_NAME#v}-x64.dmg');
     const linux = job('linux');
     expect(linux).toContain('release/*.AppImage');
     expect(linux).toContain('release/*.deb');

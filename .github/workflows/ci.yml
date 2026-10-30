@@ -90,9 +90,17 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           file "$app/Contents/Resources/hook-helper" | grep -q arm64
           test -f "$app/Contents/Resources/trayTemplate@2x.png"
+      - run: npm run dist:mac:x64
+        env:
+          CSC_FOR_PULL_REQUEST: true
+      - name: Check the Intel app bundle
+        run: |
+          app="release/mac/lolPing.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          file "$app/Contents/Resources/hook-helper" | grep -q x86_64
       - uses: actions/upload-artifact@v4
         with:
-          name: lolPing-mac-arm64
+          name: lolPing-mac
           path: release/*.dmg
           retention-days: 14
 

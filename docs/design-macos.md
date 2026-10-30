@@ -9,7 +9,7 @@ Bring lolPing to macOS with the same behaviour as on Windows: hold a key, drag, 
 
 | Topic | Decision |
 |---|---|
-| Hardware | Apple Silicon (arm64) only |
+| Hardware | Apple Silicon (arm64) and Intel (x86_64) |
 | Minimum OS | macOS 13 (Ventura), required by Electron 44 |
 | Testing | No Mac available to the developer. CI on an Apple Silicon runner builds, unit-tests and packages it. A friend tries the published release. |
 | Signing | Ad-hoc (`codesign -s -`), no Apple Developer account, no notarization |
@@ -28,7 +28,7 @@ The helper stays one C++ program. `decision.cpp`, `commands`, `json`, `output`, 
 | `hooks_mac.cpp`, `main_posix.cpp` | macOS |
 | `macinput.{h,cpp}` | Pure logic used by `hooks_mac.cpp`, no Apple headers, so it is unit-tested on both platforms |
 
-`build.sh` compiles with `clang++ -std=c++20 -arch arm64` and links CoreGraphics, CoreFoundation and ApplicationServices.
+`build.sh` compiles with `clang++ -std=c++20 -arch <MAC_ARCH>` and links CoreGraphics, CoreFoundation and ApplicationServices. `MAC_ARCH` defaults to `arm64`; release builds set it to `x86_64` for Intel.
 
 ### 2.1 Event tap
 
@@ -83,9 +83,9 @@ Creating an active tap needs Accessibility. If `CGEventTapCreate` returns `NULL`
 ## 5. Packaging, CI, release
 
 - `npm run build:helper` / `test:helper` call `native/hook-helper/run.mjs`, which runs `build.cmd` or `build.sh`.
-- `npm run dist` builds the Windows installer, `npm run dist:mac` the Mac `.dmg` (`lolPing-<version>-arm64.dmg`), ad-hoc signed with `identity: "-"` and `hardenedRuntime: false`, `LSUIElement` not set (the Dock is managed at runtime).
+- `npm run dist` builds the Windows installer, `npm run dist:mac` the Apple Silicon `.dmg` (`lolPing-<version>-arm64.dmg`), and `npm run dist:mac:x64` the Intel `.dmg` (`lolPing-<version>-x64.dmg`). Both are ad-hoc signed with `identity: "-"` and `hardenedRuntime: false`; `LSUIElement` is not set (the Dock is managed at runtime).
 - `tools/make_icon.py` also writes `build/icon.png` (1024 px) and the tray templates.
-- CI: a `macos-latest` job runs typecheck, helper tests, TypeScript tests and `dist:mac`, then `codesign --verify --deep --strict` on the app.
+- CI: a `macos-latest` job runs typecheck, helper tests, TypeScript tests and both macOS builds, then verifies each app bundle and its helper architecture.
 - Release: pushing a matching version tag starts the workflow, which creates a draft while Windows, Mac and Linux jobs upload their packages; the final job publishes it.
 
 ## 6. Known Mac limitations

@@ -136,6 +136,7 @@ function start(): void {
       ? new MacBackend({
         apiBase: testUrl ?? RELEASES_API,
         currentVersion: app.getVersion(),
+        arch: process.arch === 'arm64' ? 'arm64' : 'x64',
         fetch,
         downloadsDir: app.getPath('downloads'),
         focus: () => app.focus({ steal: true }), // the dialog is shown from a menu bar app, which is not the active one

@@ -6,7 +6,7 @@ This file is for everyone who changes code here: maintainers, contributors, and 
 
 A League of Legends ping wheel for the Windows and macOS desktop. Hold a key, drag, release on a slice, and a League ping appears with its sound. Emotes and rooms (pinging with friends over the local network or public Nostr relays) are built on the same wheel. It starts with the system, sits in the tray, and stays out of the way of normal mouse and keyboard use.
 
-Supported today: Windows 11 x64, macOS 13+ on Apple Silicon, and Linux x64 on X11 (experimental, no Wayland).
+Supported today: Windows 11 x64, macOS 13+ on Apple Silicon and Intel, and Linux x64 on X11 (experimental, no Wayland).
 
 ## Guarantees to keep
 

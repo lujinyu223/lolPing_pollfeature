@@ -12,6 +12,8 @@ const PAYLOAD_SHA = createHash('sha256').update(PAYLOAD).digest('hex');
 const LATEST_URL = `${RELEASES_API}/releases/latest`;
 const DMG_NAME = 'lolPing-0.5.1-arm64.dmg';
 const DMG_URL = `https://github.com/lujinyu223/lolPing_pollfeature/releases/download/v0.5.1/${DMG_NAME}`;
+const INTEL_DMG_NAME = 'lolPing-0.5.1-x64.dmg';
+const INTEL_DMG_URL = `https://github.com/lujinyu223/lolPing_pollfeature/releases/download/v0.5.1/${INTEL_DMG_NAME}`;
 const NOTES_URL = 'https://github.com/lujinyu223/lolPing_pollfeature/releases/tag/v0.5.1';
 
 type Release = typeof fixture;
@@ -20,7 +22,10 @@ const release = (edit: (r: Release) => void = () => undefined): Release => {
   edit(r);
   return r;
 };
-const dmgAsset = (r: Release) => r.assets.find((a) => a.name === DMG_NAME)!;
+const dmgAsset = (r: Release, name = DMG_NAME) => r.assets.find((a) => a.name === name)!;
+const releaseWithIntel = (): Release => release((r) => {
+  r.assets.push({ ...dmgAsset(r), name: INTEL_DMG_NAME, browser_download_url: INTEL_DMG_URL });
+});
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status });
 
@@ -51,7 +56,7 @@ function serve(rel: unknown = release(), dmg: () => Response | Promise<Response>
     const url = String(input);
     calls.push({ url, init });
     if (url === LATEST_URL) return rel instanceof Response ? rel : json(rel);
-    if (url === DMG_URL) return dmg();
+    if (url === DMG_URL || url === INTEL_DMG_URL) return dmg();
     return new Response('not found', { status: 404 });
   }) as typeof fetch;
 }
@@ -60,6 +65,7 @@ function make(over: Partial<MacBackendDeps> = {}): { backend: MacBackend; deps: 
   const deps: MacBackendDeps = {
     apiBase: RELEASES_API,
     currentVersion: '0.5.0',
+    arch: 'arm64',
     fetch: serve(),
     downloadsDir: dir,
     focus: vi.fn(),
@@ -138,8 +144,19 @@ describe('MacBackend.check', () => {
     expect(await make({ fetch: serve(without) }).backend.check()).toBeNull();
     const wrongVersion = release((r) => (dmgAsset(r).name = 'lolPing-0.5.0-arm64.dmg'));
     expect(await make({ fetch: serve(wrongVersion) }).backend.check()).toBeNull();
-    const intel = release((r) => (dmgAsset(r).name = 'lolPing-0.5.1-x64.dmg'));
-    expect(await make({ fetch: serve(intel) }).backend.check()).toBeNull();
+    const intelOnly = release((r) => {
+      const asset = { ...dmgAsset(r), name: INTEL_DMG_NAME, browser_download_url: INTEL_DMG_URL };
+      r.assets = r.assets.filter((item) => item.name !== DMG_NAME);
+      r.assets.push(asset);
+    });
+    expect(await make({ fetch: serve(intelOnly) }).backend.check()).toBeNull();
+  });
+
+  it('selects and downloads the Intel disk image on x64', async () => {
+    const { backend, info } = await found({ arch: 'x64', fetch: serve(releaseWithIntel()) });
+    await backend.download(info, () => undefined, noAbort());
+    expect(calls.some((call) => call.url === INTEL_DMG_URL)).toBe(true);
+    expect(files()).toEqual([INTEL_DMG_NAME]);
   });
 
   it('treats non-JSON and missing fields as a failed check', async () => {
@@ -474,6 +491,12 @@ describe('MacBackend.install', () => {
     expect(order).toEqual(['focus', 'dialog Drag lolPing into Applications.', `open ${DMG_NAME}`, 'quit']);
     expect(deps.openPath).toHaveBeenCalledWith(path.join(dir, DMG_NAME));
     expect(deps.showDialog).toHaveBeenCalledWith(deps.dialogText());
+  });
+
+  it('opens the Intel disk image on x64', async () => {
+    const { backend, deps } = make({ arch: 'x64' });
+    await backend.install({ version: '0.5.1', notesUrl: NOTES_URL });
+    expect(deps.openPath).toHaveBeenCalledWith(path.join(dir, INTEL_DMG_NAME));
   });
 
   it('does not open the image until the dialog is dismissed', async () => {

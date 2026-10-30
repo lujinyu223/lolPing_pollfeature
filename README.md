@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>Download for Windows</b></a> ·
-  <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>Download for Mac</b></a> (Apple Silicon, experimental) ·
+  <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>Download for Mac</b></a> (Apple Silicon and Intel, experimental) ·
   <a href="https://github.com/lujinyu223/lolPing_pollfeature/releases/latest"><b>Download for Linux</b></a> (X11, experimental)
 </p>
 
@@ -44,9 +44,9 @@ lolPing is built for Windows 11, 64-bit. Windows 10 may work, but it isn't teste
 
 ### macOS (experimental)
 
-The Mac version needs an Apple Silicon Mac (M1 or later) and macOS 13 or later. It is built and tested automatically, but hasn't had much use on real Macs yet. Please [report](https://github.com/lujinyu223/lolPing_pollfeature/issues) anything that doesn't work.
+The Mac version supports Apple Silicon and Intel Macs with macOS 13 or later. It is built and tested automatically, but hasn't had much use on real Macs yet. Please [report](https://github.com/lujinyu223/lolPing_pollfeature/issues) anything that doesn't work.
 
-1. Download `lolPing-<version>-arm64.dmg` from the [latest release](https://github.com/lujinyu223/lolPing_pollfeature/releases/latest), open it, and drag lolPing into Applications.
+1. Download `lolPing-<version>-arm64.dmg` for Apple Silicon or `lolPing-<version>-x64.dmg` for Intel from the [latest release](https://github.com/lujinyu223/lolPing_pollfeature/releases/latest), open it, and drag lolPing into Applications.
 2. Open lolPing. It isn't signed by a registered Apple developer, so macOS says it can't check it for malware. Select **Done**, open **System Settings → Privacy & Security**, scroll down, select **Open Anyway** next to the lolPing message, and confirm.
    If macOS instead says lolPing "is damaged", run `xattr -dr com.apple.quarantine /Applications/lolPing.app` in Terminal and open it again.
 3. lolPing asks for **Accessibility** access, which it needs to read the mouse and keyboard. Select **Open System Settings** and turn lolPing on. Pinging starts as soon as it's allowed.
@@ -138,7 +138,7 @@ Join a room and everyone in it sees your pings on their own screen, at the same 
 You need Node 22.12 or later, plus:
 
 - **Windows:** Windows 11 and Visual Studio 2022 or later with the "Desktop development with C++" workload.
-- **macOS:** an Apple Silicon Mac with the Xcode Command Line Tools (`xcode-select --install`). Allow Accessibility for the app that runs `npm run dev` (for example Terminal) so the helper can read input.
+- **macOS:** a Mac with the Xcode Command Line Tools (`xcode-select --install`). Allow Accessibility for the app that runs `npm run dev` (for example Terminal) so the helper can read input.
 
 ```bash
 npm install
@@ -156,6 +156,7 @@ npm run dev
 | `npm run typecheck` | Type-checks everything |
 | `npm run dist` | Builds the Windows installer into `release/` |
 | `npm run dist:mac` | Builds the Mac disk image into `release/` (on a Mac) |
+| `npm run dist:mac:x64` | Builds the Intel Mac disk image into `release/` (on a Mac) |
 | `npm run dev:site` | Serves a browser demo of the wheel (`site/`) |
 | `npm run media` | Re-records `docs/media/demo.gif` and `docs/media/og.png` from that demo (needs ffmpeg) |
 | `node tools/room-peer/run.mjs <code>` | Joins a room as a fake member that pings at random, to try rooms with one computer; `--relay` joins through the relays and `--emotes` also sends emotes (see [`tools/room-peer`](tools/room-peer)) |
@@ -171,7 +172,7 @@ node -p "'v' + require('./package.json').version"
 
 If the Release workflow fails at “Check the tag matches package.json”, push the matching tag on the intended release commit. Rerunning the mismatched tag will fail again; do not remove the check, since upload filenames also depend on the tag matching the package version.
 
-The Release workflow creates a draft release, builds the Windows installer, Mac disk image, Linux AppImage and Debian package, and attaches them. It also attaches `latest.yml` and the Windows installer's `.blockmap`, which electron-updater needs to update installed copies. A last job publishes the release once all platform packages are attached.
+The Release workflow creates a draft release, builds the Windows installer, Apple Silicon and Intel Mac disk images, Linux AppImage and Debian package, and attaches them. It also attaches `latest.yml` and the Windows installer's `.blockmap`, which electron-updater needs to update installed copies. A last job publishes the release once all platform packages are attached.
 
 ## How it works
 

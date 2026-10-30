@@ -66,10 +66,17 @@ jobs:
       - run: npm test
       - run: npm run dist:mac
       - run: codesign --verify --deep --strict "release/mac-arm64/lolPing.app"
-      - name: Upload the disk image
+      - name: Upload the Apple Silicon disk image
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" "release/lolPing-${GITHUB_REF_NAME#v}-arm64.dmg" --clobber
+      - run: npm run dist:mac:x64
+      - run: codesign --verify --deep --strict "release/mac/lolPing.app"
+      - run: file "release/mac/lolPing.app/Contents/Resources/hook-helper" | grep -q x86_64
+      - name: Upload the disk image
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" "release/lolPing-${GITHUB_REF_NAME#v}-x64.dmg" --clobber
 
   linux:
     needs: release

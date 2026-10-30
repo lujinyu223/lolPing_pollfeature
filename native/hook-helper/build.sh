@@ -6,7 +6,12 @@ mkdir -p build
 case "$(uname -s)" in
   Darwin)
     CXX=${CXX:-clang++}
-    FLAGS="-std=c++20 -arch arm64 -mmacosx-version-min=13.0 -Wall -Wextra"
+    MAC_ARCH=${MAC_ARCH:-arm64}
+    case "$MAC_ARCH" in
+      arm64|x86_64) ;;
+      *) echo "Unsupported macOS architecture: $MAC_ARCH" >&2; exit 2 ;;
+    esac
+    FLAGS="-std=c++20 -arch $MAC_ARCH -mmacosx-version-min=13.0 -Wall -Wextra"
     "$CXX" $FLAGS -O2 src/main_posix.cpp src/hooks_mac.cpp src/macinput.cpp src/simulate.cpp src/commands.cpp \
       src/output.cpp src/json.cpp src/decision.cpp \
       -framework ApplicationServices -framework CoreFoundation -o build/hook-helper
